@@ -2,113 +2,95 @@ import streamlit as st
 import pandas as pd
 from streamlit_gsheets import GSheetsConnection
 from PIL import Image
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
-from google.oauth2 import service_account
+import requests
+import base64
 import io
 
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Simulado Constantino - Premium", layout="centered", page_icon="📝")
 
-# --- ID DA SUA PASTA DO DRIVE ---
-ID_PASTA_DRIVE = "1vQrVswZ-_5TFDoHWJuEuxjGQLwPBBgqD"
+# --- DADOS DO SEU GITHUB ---
+# Verifique se o seu usuário e repositório são exatamente estes:
+GITHUB_USER = "arloncb" 
+GITHUB_REPO = "simulado-constantino"
+GITHUB_TOKEN = st.secrets["github_token"]
 
-# Função para fazer o upload da imagem para o Google Drive
-def upload_to_drive(file, filename):
+# Função para enviar a imagem diretamente para o repositório do GitHub
+def upload_to_github(file, filename):
     try:
-        # Usa as mesmas credenciais da planilha que já estão no Secrets
-        info_chave = st.secrets["connections"]["gsheets"]
-        credentials = service_account.Credentials.from_service_account_info(info_chave)
-        service = build('drive', 'v3', credentials=credentials)
+        # A imagem será salva em uma pasta chamada 'imagens' dentro do GitHub
+        path = f"imagens/{filename}"
+        url = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/contents/{path}"
         
-        file_metadata = {'name': filename, 'parents': [ID_PASTA_DRIVE]}
-        media = MediaIoBaseUpload(io.BytesIO(file.getvalue()), mimetype='image/jpeg')
+        # Converte a imagem para Base64 (formato que o GitHub exige)
+        content = base64.b64encode(file.getvalue()).decode()
         
-        uploaded_file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
-        # Retorna o link direto para a imagem
-        return f"https://drive.google.com/uc?id={uploaded_file.get('id')}"
+        headers = {
+            "Authorization": f"token {GITHUB_TOKEN}",
+            "Accept": "application/vnd.github.v3+json"
+        }
+        
+        data = {
+            "message": f"Upload de imagem: {filename}",
+            "content": content,
+            "branch": "main" # ou 'master', dependendo do seu GitHub
+        }
+        
+        res = requests.put(url, json=data, headers=headers)
+        
+        if res.status_code in [200, 201]:
+            # Retorna o link 'raw' que abre a imagem direto no navegador
+            return f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/main/{path}"
+        else:
+            st.error(f"Erro no GitHub: {res.json().get('message')}")
+            return ""
     except Exception as e:
-        st.error(f"Erro ao enviar para o Drive: {e}")
+        st.error(f"Erro técnico no upload: {e}")
         return ""
 
-# --- DESIGN PREMIUM: CORES VIVAS E CONTRASTE ---
+# --- ESTILO VISUAL PREMIUM (CORES VÍVIDAS) ---
 st.markdown("""
     <style>
-    /* Fundo Mesh Gradient */
     [data-testid="stAppViewContainer"] {
-        background-color: #1e1b4b;
-        background-image: 
-            radial-gradient(at 0% 0%, rgba(79, 70, 229, 0.8) 0, transparent 50%), 
-            radial-gradient(at 100% 0%, rgba(124, 58, 237, 0.8) 0, transparent 50%), 
-            radial-gradient(at 100% 100%, rgba(219, 39, 119, 0.8) 0, transparent 50%), 
-            radial-gradient(at 0% 100%, rgba(37, 99, 235, 0.8) 0, transparent 50%);
+        background: linear-gradient(135deg, #1e1b4b 0%, #3b82f6 100%);
         background-attachment: fixed;
     }
-    [data-testid="stHeader"] { background: rgba(0,0,0,0); }
-    h1, h3, .stSubheader {
-        color: #ffffff !important;
-        font-weight: 800 !important;
-        text-shadow: 3px 3px 6px rgba(0,0,0,0.4);
-        text-align: center;
-    }
-    /* Estilo do Card Branco */
     .stForm {
         background: rgba(255, 255, 255, 0.98) !important;
         padding: 40px !important;
         border-radius: 30px !important;
-        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5) !important;
+        box-shadow: 0 25px 50px rgba(0,0,0,0.5) !important;
     }
-    /* Labels em Preto Sólido */
+    h1, h3, .stSubheader { color: white !important; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
     .stTextInput label, .stSelectbox label, .stTextArea label {
-        color: #000000 !important;
-        font-size: 22px !important;
-        font-weight: 800 !important;
+        color: #000000 !important; font-size: 20px !important; font-weight: bold !important;
     }
-    /* Botão de Salvar */
     div.stButton > button:first-child {
-        width: 100%;
-        background: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%);
-        color: white !important;
-        padding: 20px;
-        font-size: 24px;
-        font-weight: bold;
-        border-radius: 15px;
-        border: none;
-        transition: 0.3s;
+        width: 100%; background: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%);
+        color: white !important; padding: 20px; font-size: 22px; font-weight: bold;
+        border-radius: 15px; border: none; transition: 0.3s;
     }
-    div.stButton > button:first-child:hover { transform: translateY(-3px); }
-    /* Alerta de Sucesso */
     .sucesso-gigante {
-        background: #10b981;
-        color: white;
-        padding: 40px;
-        border-radius: 20px;
-        text-align: center;
-        font-size: 35px;
-        font-weight: 900;
+        background: #10b981; color: white; padding: 35px; border-radius: 20px;
+        text-align: center; font-size: 35px; font-weight: 900;
     }
-    .rodape { text-align: center; color: white; font-weight: bold; margin-top: 50px; padding: 20px; }
+    .rodape { text-align: center; color: white; font-weight: bold; margin-top: 50px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- LOGO ---
+# --- TÍTULOS ---
 try:
     img_logo = Image.open("logo.png")
-    st.image(img_logo, width=220)
-except:
-    try:
-        img_logo = Image.open("logo.jpg")
-        st.image(img_logo, width=220)
-    except:
-        pass
+    st.image(img_logo, width=200)
+except: pass
 
 st.title("📝 Portal do Professor")
 st.subheader("Simulados - Escola Padre Constantino")
 
-# 2. CONEXÃO
+# 2. CONEXÃO COM PLANILHA
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 3. FORMULÁRIO PRINCIPAL
+# 3. FORMULÁRIO
 with st.form("form_questoes", clear_on_submit=True):
     st.markdown("### 📋 Identificação")
     prof = st.text_input("Nome do Professor (a):")
@@ -122,7 +104,6 @@ with st.form("form_questoes", clear_on_submit=True):
     foto = st.file_uploader("Upload de Imagem (Opcional):", type=["png", "jpg", "jpeg"])
 
     st.markdown("---")
-    st.markdown("### 🔘 Alternativas")
     alt_a = st.text_input("Alternativa A:")
     alt_b = st.text_input("Alternativa B:")
     alt_c = st.text_input("Alternativa C:")
@@ -139,11 +120,13 @@ with st.form("form_questoes", clear_on_submit=True):
             try:
                 link_foto = ""
                 if foto:
-                    with st.spinner("Enviando imagem para o Drive..."):
-                        # Nome do arquivo será: NomeProf_Turma_Horario.jpg
-                        nome_arquivo = f"{prof}_{turma}_{pd.Timestamp.now().strftime('%H%M%S')}.jpg"
-                        link_foto = upload_to_drive(foto, nome_arquivo)
+                    with st.spinner("Salvando imagem no GitHub..."):
+                        # Criamos um nome único para o arquivo
+                        ext = foto.name.split('.')[-1]
+                        nome_arquivo = f"{disc}_{turma}_{pd.Timestamp.now().strftime('%H%M%S')}.{ext}".replace(" ", "_")
+                        link_foto = upload_to_github(foto, nome_arquivo)
 
+                # Salvar na Planilha
                 dados_atuais = conn.read(worksheet="Página1", ttl=0)
                 nova_questao = pd.DataFrame([{
                     "Data": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"),
@@ -161,9 +144,9 @@ with st.form("form_questoes", clear_on_submit=True):
                 st.markdown('<div class="sucesso-gigante">✅ SALVO COM SUCESSO!</div>', unsafe_allow_html=True)
                 st.balloons()
             except Exception as e:
-                st.error(f"Erro técnico: {e}")
+                st.error(f"Erro ao salvar: {e}")
 
-# --- 4. PRÉ-VISUALIZAÇÃO ---
+# 4. PRÉ-VISUALIZAÇÃO
 if pergunta:
     st.markdown("<br><h3 style='color:white;'>👀 Pré-visualização:</h3>", unsafe_allow_html=True)
     with st.container():
