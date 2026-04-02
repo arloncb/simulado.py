@@ -37,48 +37,54 @@ def upload_to_github(file, filename):
         return f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/main/{path}" if res.status_code in [200, 201] else ""
     except: return ""
 
-# --- FUNÇÃO GERADORA DE PDF (VERSÃO BYTES) ---
+# --- FUNÇÃO GERADORA DE PDF (ALINHAMENTO REVISADO) ---
 def gerar_pdf_bytes(df_limpo):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
+    pdf.set_left_margin(15) # Margem fixa para evitar que o texto fuja
     
-    # Função interna para tratar o texto de forma segura
-    def txt(t):
-        return str(t).encode('latin-1', 'replace').decode('latin-1')
+    largura_util = 180 # Reduzi um pouco para garantir que não corte na borda
 
+    def escrever_texto(t, estilo="", tam=11):
+        pdf.set_font("Helvetica", estilo, tam)
+        # O segredo: forçar o cursor a voltar para o X=15 (margem esquerda) antes de cada bloco
+        pdf.set_x(15)
+        pdf.multi_cell(largura_util, 7, str(t).encode('latin-1', 'replace').decode('latin-1'), align='L')
+
+    # Título Principal
     pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(190, 10, txt("Simulado - Escola Padre Constantino"), ln=True, align="C")
+    pdf.cell(largura_util, 10, "Simulado - Escola Padre Constantino", ln=True, align="C")
     pdf.ln(10)
 
     for i, row in df_limpo.iterrows():
-        pdf.set_font("Helvetica", "B", 11)
-        pdf.multi_cell(190, 8, txt(f"QUESTAO {i+1} | {row['Disciplina']} - {row['Turma']}"))
+        # Cabeçalho da Questão
+        escrever_texto(f"QUESTÃO {i+1} | {row['Disciplina']} - {row['Turma']}", "B", 12)
         
-        pdf.set_font("Helvetica", "I", 9)
-        pdf.multi_cell(190, 6, txt(f"Habilidade: {row['Habilidade']}"))
+        # Habilidade
+        escrever_texto(f"Habilidade: {row['Habilidade']}", "I", 10)
         pdf.ln(2)
 
-        pdf.set_font("Helvetica", "", 11)
-        pdf.multi_cell(190, 7, txt(row['Pergunta']))
+        # Enunciado
+        escrever_texto(row['Pergunta'], "", 11)
         pdf.ln(4)
         
+        # Alternativas uma embaixo da outra (Sempre à esquerda)
         for letra in ['A', 'B', 'C', 'D', 'E']:
-            pdf.multi_cell(190, 6, txt(f"{letra.lower()}) {row[letra]}"))
+            escrever_texto(f"{letra.lower()}) {row[letra]}", "", 11)
         
+        pdf.ln(10)
+        # Linha separadora manual para não dar erro de posição
+        pdf.set_x(15)
+        pdf.line(15, pdf.get_y(), 195, pdf.get_y())
         pdf.ln(8)
-        pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-        pdf.ln(5)
     
-    # O SEGREDO: converter para bytes que o Streamlit entende
     return bytes(pdf.output())
 
 # --- DESIGN PREMIUM ---
 st.markdown("""
     <style>
-    [data-testid="stAppViewContainer"] {
-        background: linear-gradient(135deg, #1e1b4b 0%, #3b82f6 100%) fixed;
-    }
+    [data-testid="stAppViewContainer"] { background: linear-gradient(135deg, #1e1b4b 0%, #3b82f6 100%) fixed; }
     .stForm { background: rgba(255, 255, 255, 0.98) !important; padding: 40px !important; border-radius: 25px !important; }
     h1, h2, h3, .stSubheader { color: white !important; font-weight: 800 !important; text-align: center; }
     .stTextInput label, .stSelectbox label, .stTextArea label { color: black !important; font-weight: bold !important; }
@@ -100,7 +106,7 @@ if pagina == "📝 Enviar Questão":
     st.title("📝 Portal do Professor")
     st.subheader("Escola Padre Constantino")
 
-    with st.form("form_v4"):
+    with st.form("form_final"):
         st.markdown("<h4 style='color:black;'>📋 Identificação</h4>", unsafe_allow_html=True)
         c1, c2 = st.columns(2)
         with c1:
@@ -108,7 +114,7 @@ if pagina == "📝 Enviar Questão":
             disc = st.selectbox("Sua Disciplina:", ["Selecione...", "Matemática", "Português", "História", "Geografia", "Ciências", "Biologia", "Química", "Física", "Sociologia", "Filosofia", "Inglês", "Artes", "Ed. Física"], key="d_fixo")
         with c2:
             turma = st.text_input("Série/Turma:", key="t_fixo")
-            hab = st.text_input("Habilidade BNCC:", key=f"h_{st.session_state.limpar}")
+            hab = st.text_input("BNCC:", key=f"h_{st.session_state.limpar}")
 
         st.markdown("---")
         pergunta = st.text_area("Enunciado:", height=150, key=f"q_{st.session_state.limpar}")
@@ -131,7 +137,7 @@ if pagina == "📝 Enviar Questão":
                 nova = pd.DataFrame([{"Data": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Professor (a)": prof, "Disciplina": disc, "Turma": turma, "Habilidade": hab, "Pergunta": pergunta, "A": a, "B": b, "C": c, "D": d, "E": e, "Correta": gab, "Link Imagem": img_url}])
                 conn.update(worksheet="Página1", data=pd.concat([df_old, nova], ignore_index=True))
                 st.session_state.limpar += 1
-                st.success("✅ Salvo! Dados mantidos.")
+                st.success("✅ Salvo! Nome e Disciplina mantidos.")
                 st.rerun()
 
 # ==========================================
@@ -140,6 +146,7 @@ if pagina == "📝 Enviar Questão":
 else:
     st.title("📋 Área Pedagógica")
     if st.text_input("Senha de Acesso:", type="password") == "constantino2026":
+        st.success("Acesso Autorizado")
         df = conn.read(worksheet="Página1", ttl=0).fillna("")
         if not df.empty:
             c1, c2 = st.columns(2)
@@ -156,12 +163,10 @@ else:
             st.markdown("### 📥 Exportar")
             col_pdf, col_csv = st.columns(2)
             with col_pdf:
-                # O PDF agora é gerado em bytes reais
-                pdf_output = gerar_pdf_bytes(dff)
-                st.download_button(label="📄 Baixar PDF", data=pdf_output, file_name="simulado.pdf", mime="application/pdf")
+                st.download_button(label="📄 Baixar Simulado (PDF)", data=gerar_pdf_bytes(dff), file_name="simulado_final.pdf", mime="application/pdf")
             with col_csv:
                 st.download_button(label="📊 Baixar Excel (CSV)", data=dff.to_csv(index=False).encode('utf-8'), file_name="simulado.csv", mime="text/csv")
         else: st.info("O banco de dados está vazio.")
     elif st.session_state.get('p_fixo') == "ERRO": st.error("Senha incorreta!")
 
-st.markdown('<br><p style="text-align:center; color:white;">Feito com dedicação Equipe Padre Constantino ❤️</p>', unsafe_allow_html=True)
+st.markdown('<br><p style="text-align:center; color:white;">Equipe Padre Constantino ❤️</p>', unsafe_allow_html=True)
