@@ -6,59 +6,61 @@ from PIL import Image
 # 1. Configuração da Página
 st.set_page_config(page_title="Gerador de Simulados - Constantino", layout="centered", page_icon="📝")
 
-# --- ESTILO CSS AVANÇADO (Cores de Fundo e Design) ---
+# --- ESTILO CSS AVANÇADO (Cores Vívidas e Contraste) ---
 st.markdown("""
     <style>
-    /* 1. Fundo da página inteira (Degradê Azul Suave) */
+    /* 1. Fundo com Degradê mais Escuro e Vívido */
     [data-testid="stAppViewContainer"] {
-        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
     }
 
-    /* 2. Remover fundo branco do cabeçalho */
+    /* 2. Ajuste do Cabeçalho e Títulos para Branco (para destacar no fundo escuro) */
     [data-testid="stHeader"] {
         background: rgba(0,0,0,0);
     }
+    h1, h3, .stSubheader {
+        color: white !important;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
 
-    /* 3. Estilo do Formulário (Branco com Sombra) */
+    /* 3. Estilo do Card do Formulário (Contraste Máximo) */
     .stForm {
-        background-color: white !important;
-        padding: 30px !important;
-        border-radius: 20px !important;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important;
+        background-color: #ffffff !important;
+        padding: 40px !important;
+        border-radius: 25px !important;
+        box-shadow: 0 15px 35px rgba(0,0,0,0.4) !important;
         border: none !important;
     }
 
-    /* 4. Ajustes de Fontes */
-    html, body, [class*="css"] {
-        font-size: 18px !important;
-    }
+    /* 4. Fontes e Labels dentro do Formulário */
     .stTextInput label, .stSelectbox label, .stTextArea label {
         font-size: 20px !important;
         font-weight: bold !important;
-        color: #2c3e50 !important;
+        color: #1e3a8a !important; /* Azul escuro nos textos internos */
     }
 
-    /* 5. Alerta de Sucesso Personalizado */
+    /* 5. Alerta de Sucesso Vibrante */
     .sucesso-gigante {
         padding: 40px;
-        background-color: #27ae60;
+        background-color: #059669; /* Verde Esmeralda */
         color: white;
         border-radius: 20px;
         text-align: center;
         font-size: 35px !important;
         font-weight: bold;
         margin: 20px 0;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
     }
 
-    /* 6. Rodapé */
+    /* 6. Rodapé (Claro para ler sobre o azul) */
     .rodape {
         text-align: center;
-        color: #555;
+        color: #e2e8f0;
         font-style: italic;
-        margin-top: 50px;
+        margin-top: 60px;
         padding: 20px;
         font-weight: 500;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
     }
     </style>
     """, unsafe_allow_html=True)
@@ -126,23 +128,9 @@ with st.form("form_questoes", clear_on_submit=True):
             except Exception as e:
                 st.error(f"Erro ao salvar: {e}")
 
-# --- 4. PRÉ-VISUALIZAÇÃO ---
+# --- 4. PRÉ-VISUALIZAÇÃO (Estilo Papel) ---
 if pergunta:
     st.markdown("---")
     st.subheader("👀 Pré-visualização:")
     with st.container():
-        # Estilo de "Papel" para a questão
         st.markdown(f"""
-        <div style="background-color: #fff; padding: 20px; border-left: 10px solid #3498db; border-radius: 10px;">
-            <strong>Questão:</strong> {pergunta}
-        </div>
-        """, unsafe_allow_html=True)
-        if foto: st.image(foto)
-        st.write(f"a) {alt_a}")
-        st.write(f"b) {alt_b}")
-        st.write(f"c) {alt_c}")
-        st.write(f"d) {alt_d}")
-        st.write(f"e) {alt_e}")
-
-# --- 5. RODAPÉ ---
-st.markdown('<div class="rodape">Feito com carinho pela Equipe Padre Constantino ❤️</div>', unsafe_allow_html=True)
