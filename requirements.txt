@@ -1,5 +1,5 @@
 pandas
 streamlit
 st-gsheets-connection
-google-api-python-client
-google-auth
+requests
+Pillow
