@@ -1,76 +1,91 @@
 import streamlit as st
 import pandas as pd
 from streamlit_gsheets import GSheetsConnection
+from PIL import Image
 
-# 1. Configuração da página
-st.set_page_config(page_title="Gerador de Simulados - Constantino", layout="wide")
+# 1. Configuração da Página
+st.set_page_config(page_title="Gerador de Simulados - Constantino", layout="wide", page_icon="📝")
 
-st.title("📝 Envio de Questões para Simulado")
-st.info("Professores: preencham os campos abaixo. Para fórmulas matemáticas, use o cifrão: $x^2$.")
+st.title("📝 Portal do Professor - Envio de Questões")
+st.markdown("---")
 
-# 2. Conexão com o Google Sheets
+# 2. Conexão com o Google Sheets (usa as Secrets que configuramos)
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 3. Formulário do Professor
-with st.form("form_questoes"):
-    col1, col2 = st.columns(2)
+# 3. Formulário de Entrada
+with st.form("form_questoes", clear_on_submit=True):
+    st.subheader("📋 Identificação e Enunciado")
+    
+    col1, col2, col3 = st.columns([2, 2, 1])
     with col1:
         prof = st.text_input("Nome do Professor:")
-        disc = st.selectbox("Disciplina:", ["Matemática", "Português", "História", "Geografia", "Ciências", "Outra"])
     with col2:
-        turma = st.text_input("Turma (ex: 6º A):")
-        
+        disc = st.selectbox("Disciplina:", ["Matemática", "Português", "História", "Geografia", "Ciências", "Inglês", "Artes", "Ed. Física"])
+    with col3:
+        turma = st.text_input("Turma (ex: 9º A):")
+
+    pergunta = st.text_area("Enunciado da Questão (Dica: Use $ para fórmulas, ex: $x^2$):", height=150)
+    
+    # Campo de Imagem (opcional)
+    foto = st.file_uploader("Upload de Imagem ou Gráfico (se houver):", type=["png", "jpg", "jpeg"])
+
     st.write("---")
-    
-    # Campos da Questão
-    pergunta = st.text_area("Enunciado da Questão:")
-    
-    # Campo para Imagem (O professor sobe a foto se precisar)
-    foto = st.file_uploader("Tem imagem ou fórmula complexa? Suba a foto aqui:", type=["png", "jpg", "jpeg"])
+    st.subheader("🔘 Alternativas")
     
     col_a, col_b = st.columns(2)
     with col_a:
         alt_a = st.text_input("Alternativa A:")
-        alt_c = st.text_input("Alternativa C:")
-        alt_e = st.text_input("Alternativa E:")
-    with col_b:
         alt_b = st.text_input("Alternativa B:")
+        alt_c = st.text_input("Alternativa C:")
+    with col_b:
         alt_d = st.text_input("Alternativa D:")
-        gabarito = st.selectbox("Qual é a correta?", ["A", "B", "C", "D", "E"])
+        alt_e = st.text_input("Alternativa E:")
+        gabarito = st.selectbox("Qual é a alternativa CORRETA?", ["A", "B", "C", "D", "E"])
 
-    enviar = st.form_submit_button("SALVAR QUESTÃO NA PLANILHA")
+    enviar = st.form_submit_button("💾 SALVAR QUESTÃO NA PLANILHA")
 
+    # --- Lógica de Salvamento ---
     if enviar:
-        # Aqui o código vai enviar os dados para o Google Sheets
-        nova_linha = pd.DataFrame([{
-            "Data": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"),
-            "Professor": prof,
-            "Disciplina": disc,
-            "Turma": turma,
-            "Pergunta": pergunta,
-            "A": alt_a, "B": alt_b, "C": alt_c, "D": alt_d, "E": alt_e,
-            "Correta": gabarito
-        }])
-        
-        # Comando para adicionar na planilha
-        try:
-            # Pegamos os dados existentes
-            existente = conn.read(worksheet="Página1")
-            updated_df = pd.concat([existente, nova_linha], ignore_index=True)
-            conn.update(worksheet="Página1", data=updated_df)
-            st.success("✅ Questão salva com sucesso!")
-        except:
-            st.error("Erro na conexão. Precisamos configurar as 'Secrets'.")
+        if prof and pergunta:
+            try:
+                # 1. Lemos os dados atuais (ttl=0 força a leitura do que está lá agora)
+                # IMPORTANTE: Verifique se o nome da aba na sua planilha é "Página1"
+                dados_atuais = conn.read(worksheet="Página1", ttl=0)
+                
+                # 2. Criamos a nova linha
+                nova_questao = pd.DataFrame([{
+                    "Data": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"),
+                    "Professor": prof,
+                    "Disciplina": disc,
+                    "Turma": turma,
+                    "Pergunta": pergunta,
+                    "A": alt_a, "B": alt_b, "C": alt_c, "D": alt_d, "E": alt_e,
+                    "Correta": gabarito
+                }])
+                
+                # 3. Concatenamos (penduramos a nova embaixo da antiga)
+                df_final = pd.concat([dados_atuais, nova_questao], ignore_index=True)
+                
+                # 4. Atualizamos a planilha
+                conn.update(worksheet="Página1", data=df_final)
+                
+                st.success(f"✅ Questão de {disc} salva com sucesso! O formulário foi limpo para a próxima.")
+                st.balloons()
+            except Exception as e:
+                st.error(f"❌ Erro ao conectar com a planilha: {e}")
+        else:
+            st.warning("⚠️ Atenção: Preencha pelo menos o nome do professor e o enunciado da questão.")
 
-# --- VISUALIZAÇÃO PRÉVIA (Como o aluno verá) ---
+# --- 4. PRÉ-VISUALIZAÇÃO (Para o professor conferir o visual) ---
 st.write("---")
-st.subheader("👀 Pré-visualização da Questão:")
+st.subheader("👀 Como o aluno verá no simulado:")
 if pergunta:
-    st.write(f"**{pergunta}**")
-    if foto:
-        st.image(foto)
-    st.write(f"a) {alt_a}")
-    st.write(f"b) {alt_b}")
-    st.write(f"c) {alt_c}")
-    st.write(f"d) {alt_d}")
-    st.write(f"e) {alt_e}")
+    with st.container(border=True):
+        st.write(f"**Questão:** {pergunta}")
+        if foto:
+            st.image(foto, caption="Imagem da Questão")
+        st.write(f"**a)** {alt_a}")
+        st.write(f"**b)** {alt_b}")
+        st.write(f"**c)** {alt_c}")
+        st.write(f"**d)** {alt_d}")
+        st.write(f"**e)** {alt_e}")
