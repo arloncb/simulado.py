@@ -5,50 +5,44 @@ from PIL import Image
 import requests
 import base64
 
-# 1. Configuração da Página
+# 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Simulado Constantino - Premium", layout="centered")
 
-# --- BUSCA O TOKEN ---
+# --- NOMES AJUSTADOS CONFORME SEU PRINT DO GITHUB ---
+GITHUB_USER = "arloncb" 
+GITHUB_REPO = "simulado.py" # <<-- MUDADO DE 'simulado-constantino' PARA 'simulado.py'
+
 try:
     GITHUB_TOKEN = st.secrets["github_token"]
-    GITHUB_USER = "arloncb" # <<-- VERIFIQUE SE ESTÁ IGUAL AO SEU GITHUB
-    GITHUB_REPO = "simulado-constantino" # <<-- VERIFIQUE SE O NOME DO REPOSITÓRIO É ESTE
 except:
-    st.error("❌ Erro: 'github_token' não encontrado nos Secrets.")
+    st.error("❌ Erro: 'github_token' não encontrado nos Secrets do Streamlit.")
     st.stop()
 
 def upload_to_github(file, filename):
     try:
-        # A pasta 'imagens' será criada automaticamente pelo GitHub no primeiro upload
         path = f"imagens/{filename}"
         url = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/contents/{path}"
-        
         content = base64.b64encode(file.getvalue()).decode()
         headers = {
             "Authorization": f"token {GITHUB_TOKEN}",
             "Accept": "application/vnd.github.v3+json"
         }
-        
-        # Removi o campo 'branch' para evitar erro se for 'master' ou 'main'
         data = {
             "message": f"Upload: {filename}",
-            "content": content
+            "content": content,
+            "branch": "main" # Seu print confirma que a branch é 'main'
         }
-        
         res = requests.put(url, json=data, headers=headers)
-        
         if res.status_code in [200, 201]:
-            # Retorna o link direto
             return f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/main/{path}"
         else:
-            # Mostra o erro detalhado para a gente saber o que é
-            st.error(f"Erro detalhado do GitHub: {res.json().get('message')}")
+            st.error(f"GitHub disse: {res.json().get('message')}")
             return ""
     except Exception as e:
         st.error(f"Erro na conexão: {e}")
         return ""
 
-# --- ESTILO VISUAL ---
+# --- DESIGN ---
 st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] { background: linear-gradient(135deg, #1e1b4b 0%, #3b82f6 100%); background-attachment: fixed; }
@@ -90,7 +84,7 @@ with st.form("form_simulado", clear_on_submit=True):
             try:
                 link_img = ""
                 if foto:
-                    with st.spinner("Enviando imagem..."):
+                    with st.spinner("Enviando imagem ao GitHub..."):
                         nome_f = f"{disc}_{turma}_{pd.Timestamp.now().strftime('%H%M%S')}.jpg".replace(" ", "_")
                         link_img = upload_to_github(foto, nome_f)
                 
@@ -110,4 +104,4 @@ with st.form("form_simulado", clear_on_submit=True):
             except Exception as e:
                 st.error(f"Erro ao salvar: {e}")
 
-st.markdown('<br><p style="text-align:center; color:white;">Equipe Padre Constantino ❤️</p>', unsafe_allow_html=True)
+st.markdown('<br><p style="text-align:center; color:white;">Feito com carinho pela Equipe Padre Constantino ❤️</p>', unsafe_allow_html=True)
