@@ -8,11 +8,17 @@ import io
 from fpdf import FPDF
 
 # 1. CONFIGURAÇÃO DA PÁGINA
-st.set_page_config(page_title="Portal Simulado - Constantino", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(
+    page_title="Portal Simulado - Constantino", 
+    layout="wide", 
+    page_icon="📝",
+    initial_sidebar_state="collapsed"
+)
 
 # --- CONFIGURAÇÕES GITHUB ---
 GITHUB_USER = "arloncb" 
 GITHUB_REPO = "simulado.py" 
+
 try:
     GITHUB_TOKEN = st.secrets["github_token"]
 except:
@@ -31,34 +37,49 @@ def upload_to_github(file, filename):
         headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
         data = {"message": f"Upload: {filename}", "content": content, "branch": "main"}
         res = requests.put(url, json=data, headers=headers)
-        return f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/main/{path}" if res.status_code in [200, 201] else ""
+        if res.status_code in [200, 201]:
+            return f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/main/{path}"
+        return ""
     except: return ""
 
-# --- FUNÇÃO GERADORA DE PDF ---
-def gerar_pdf_simulado(df):
+# --- FUNÇÃO GERADORA DE PDF (CORRIGIDA) ---
+def gerar_pdf_simulado(df_limpo):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, "Simulado - Escola Padre Constantino", ln=True, align="C")
+    
+    # Largura útil da página (A4 tem 210mm, descontando 10mm de cada margem = 190mm)
+    largura_util = 190 
+
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(largura_util, 10, "Simulado - Escola Padre Constantino", ln=True, align="C")
     pdf.ln(10)
 
-    for i, row in df.iterrows():
-        pdf.set_font("Arial", "B", 11)
-        pdf.multi_cell(0, 8, f"QUESTÃO {i+1} | {row['Disciplina']} - {row['Turma']}")
-        pdf.set_font("Arial", "I", 9)
-        pdf.multi_cell(0, 6, f"Habilidade: {row['Habilidade']}")
+    for i, row in df_limpo.iterrows():
+        # Título da Questão
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.multi_cell(largura_util, 8, f"QUESTÃO {i+1} | {row['Disciplina']} - {row['Turma']}")
+        
+        # Habilidade
+        pdf.set_font("Helvetica", "I", 9)
+        pdf.multi_cell(largura_util, 6, f"Habilidade: {row['Habilidade']}")
         pdf.ln(2)
-        pdf.set_font("Arial", "", 11)
-        pdf.multi_cell(0, 7, row['Pergunta'])
+
+        # Enunciado
+        pdf.set_font("Helvetica", "", 11)
+        pdf.multi_cell(largura_util, 7, str(row['Pergunta']))
         pdf.ln(4)
         
-        # Alternativas
+        # Alternativas (Uma embaixo da outra)
+        pdf.set_font("Helvetica", "", 11)
         for letra in ['A', 'B', 'C', 'D', 'E']:
-            pdf.multi_cell(0, 6, f"{letra.lower()}) {row[letra]}")
+            texto_alt = f"{letra.lower()}) {row[letra]}"
+            pdf.multi_cell(largura_util, 6, str(texto_alt))
+        
         pdf.ln(8)
-        pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+        pdf.line(10, pdf.get_y(), 200, pdf.get_y()) # Linha divisória
         pdf.ln(5)
+        
     return pdf.output()
 
 # --- DESIGN PREMIUM ---
@@ -66,7 +87,7 @@ st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] {
         background-color: #1e1b4b;
-        background-image: radial-gradient(at 0% 0%, rgba(79, 70, 229, 0.8) 0, transparent 50%), radial-gradient(at 100% 0%, rgba(124, 58, 237, 0.8) 0, transparent 50%);
+        background-image: radial-gradient(at 0% 0%, rgba(79, 70, 22, 0.8) 0, transparent 50%), radial-gradient(at 100% 0%, rgba(124, 58, 237, 0.8) 0, transparent 50%);
         background-attachment: fixed;
     }
     .stForm { background: rgba(255, 255, 255, 0.98) !important; padding: 40px !important; border-radius: 25px !important; box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
@@ -76,11 +97,11 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- ESTADO DE SESSÃO ---
-if 'limpar_count' not in st.session_state: st.session_state.limpar_count = 0
+# --- ESTADO DE SESSÃO PARA MEMÓRIA ---
+if 'limpar_id' not in st.session_state: st.session_state.limpar_id = 0
 
 # --- MENU ---
-st.sidebar.title("Menu")
+st.sidebar.title("Navegação")
 pagina = st.sidebar.radio("Ir para:", ["📝 Enviar Questão", "📋 Área da Coordenação"])
 
 # ==========================================
@@ -90,38 +111,42 @@ if pagina == "📝 Enviar Questão":
     st.title("📝 Portal do Professor")
     st.subheader("Escola Padre Constantino")
 
-    with st.form("form_v3"):
+    with st.form("form_professor"):
         st.markdown("<h4 style='color:black;'>📋 Identificação</h4>", unsafe_allow_html=True)
         col1, col2 = st.columns(2)
         with col1:
-            prof = st.text_input("Nome do Professor (a):", key="p_nome")
-            disc = st.selectbox("Disciplina:", ["Selecione...", "Matemática", "Português", "História", "Geografia", "Ciências", "Biologia", "Química", "Física", "Sociologia", "Filosofia", "Inglês", "Artes", "Ed. Física"], key="p_disc")
+            prof = st.text_input("Seu Nome:", key="prof_fixo")
+            disc = st.selectbox("Sua Disciplina:", ["Selecione...", "Matemática", "Português", "História", "Geografia", "Ciências", "Biologia", "Química", "Física", "Sociologia", "Filosofia", "Inglês", "Artes", "Ed. Física"], key="disc_fixo")
         with col2:
-            turma = st.text_input("Série/Turma:", key="p_turma")
-            hab = st.text_input("BNCC:", key=f"h_{st.session_state.limpar_count}")
+            turma = st.text_input("Série/Turma (Ex: 9 B):", key="turma_fixo")
+            hab = st.text_input("Habilidade BNCC:", key=f"hab_{st.session_state.limpar_id}")
 
         st.markdown("---")
-        pergunta = st.text_area("Enunciado:", height=150, key=f"q_{st.session_state.limpar_count}")
-        foto = st.file_uploader("Imagem:", type=["png", "jpg", "jpeg"], key=f"f_{st.session_state.limpar_count}")
+        pergunta = st.text_area("Enunciado da Questão:", height=150, key=f"q_{st.session_state.limpar_id}")
+        foto = st.file_uploader("Anexar Imagem:", type=["png", "jpg", "jpeg"], key=f"f_{st.session_state.limpar_id}")
         
         st.markdown("<h4 style='color:black;'>🔘 Alternativas</h4>", unsafe_allow_html=True)
-        a = st.text_input("A:", key=f"a_{st.session_state.limpar_count}")
-        b = st.text_input("B:", key=f"b_{st.session_state.limpar_count}")
-        c = st.text_input("C:", key=f"c_{st.session_state.limpar_count}")
-        d = st.text_input("D:", key=f"d_{st.session_state.limpar_count}")
-        e = st.text_input("E:", key=f"e_{st.session_state.limpar_count}")
-        gab = st.selectbox("Correta:", ["A", "B", "C", "D", "E"], key=f"g_{st.session_state.limpar_count}")
+        a = st.text_input("Alternativa A:", key=f"a_{st.session_state.limpar_id}")
+        b = st.text_input("Alternativa B:", key=f"b_{st.session_state.limpar_id}")
+        c = st.text_input("Alternativa C:", key=f"c_{st.session_state.limpar_id}")
+        d = st.text_input("Alternativa D:", key=f"d_{st.session_state.limpar_id}")
+        e = st.text_input("Alternativa E:", key=f"e_{st.session_state.limpar_id}")
+        gab = st.selectbox("Gabarito:", ["A", "B", "C", "D", "E"], key=f"g_{st.session_state.limpar_id}")
 
         if st.form_submit_button("💾 SALVAR QUESTÃO"):
             if not prof or disc == "Selecione..." or not pergunta:
                 st.error("🚨 Preencha os campos obrigatórios!")
             else:
                 l_img = upload_to_github(foto, f"{disc}_{pd.Timestamp.now().strftime('%H%M%S')}.jpg") if foto else ""
-                df_a = conn.read(worksheet="Página1", ttl=0)
-                nova = pd.DataFrame([{"Data": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Professor (a)": prof, "Disciplina": disc, "Turma": turma, "Habilidade": hab, "Pergunta": pergunta, "A": a, "B": b, "C": c, "D": d, "E": e, "Correta": gab, "Link Imagem": l_img}])
-                conn.update(worksheet="Página1", data=pd.concat([df_a, nova], ignore_index=True))
-                st.session_state.limpar_count += 1
-                st.success("✅ Salvo! Nome e Disciplina mantidos.")
+                df_antigo = conn.read(worksheet="Página1", ttl=0)
+                nova = pd.DataFrame([{
+                    "Data": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"),
+                    "Professor (a)": prof, "Disciplina": disc, "Turma": turma,
+                    "Habilidade": hab, "Pergunta": pergunta, "A": a, "B": b, "C": c, "D": d, "E": e, "Correta": gab, "Link Imagem": l_img
+                }])
+                conn.update(worksheet="Página1", data=pd.concat([df_antigo, nova], ignore_index=True))
+                st.session_state.limpar_id += 1
+                st.success("✅ Salvo com sucesso! Nome e Disciplina mantidos.")
                 st.rerun()
 
 # ==========================================
@@ -129,8 +154,12 @@ if pagina == "📝 Enviar Questão":
 # ==========================================
 else:
     st.title("📋 Área Pedagógica")
-    if st.text_input("Senha:", type="password") == "constantino2026":
+    senha = st.text_input("Senha de Acesso:", type="password")
+    
+    if senha == "constantino2026":
+        st.success("Acesso Autorizado")
         df = conn.read(worksheet="Página1", ttl=0).fillna("")
+        
         if not df.empty:
             c1, c2 = st.columns(2)
             f_d = c1.multiselect("Filtrar Disciplina:", df["Disciplina"].unique())
@@ -143,12 +172,25 @@ else:
             st.dataframe(dff, use_container_width=True)
             
             # BOTÕES DE DOWNLOAD
+            st.markdown("### 📥 Exportar Simulados")
             col_d1, col_d2 = st.columns(2)
             with col_d1:
-                st.download_button("📥 Baixar em PDF (Formatado)", data=gerar_pdf_simulado(dff), file_name="simulado.pdf", mime="application/pdf")
+                pdf_data = gerar_pdf_simulado(dff)
+                st.download_button(label="📄 Baixar Prova em PDF", data=pdf_data, file_name="simulado_constantino.pdf", mime="application/pdf")
             with col_d2:
-                st.download_button("📊 Baixar Excel (CSV)", data=dff.to_csv(index=False).encode('utf-8'), file_name="simulado.csv", mime="text/csv")
-        else: st.info("Banco vazio.")
-    elif st.session_state.get('pass_input') != "": st.error("Acesso negado.")
+                st.download_button(label="📊 Baixar Tabela Excel (CSV)", data=dff.to_csv(index=False).encode('utf-8'), file_name="simulado.csv", mime="text/csv")
+            
+            st.markdown("---")
+            for i, row in dff.iterrows():
+                with st.expander(f"Questão {i+1}: {row['Disciplina']} - {row['Turma']}"):
+                    st.write(f"**BNCC:** {row['Habilidade']}")
+                    st.info(f"**Pergunta:** {row['Pergunta']}")
+                    if row['Link Imagem'] and str(row['Link Imagem']).startswith("http"):
+                        st.image(row['Link Imagem'], width=400)
+                    st.write(f"a) {row['A']} | b) {row['B']} | c) {row['C']} | d) {row['D']} | e) {row['E']}")
+                    st.success(f"Gabarito: {row['Correta']}")
+        else: st.info("O banco de dados está vazio.")
+    elif senha != "":
+        st.error("Chave incorreta!")
 
 st.markdown('<br><p style="text-align:center; color:white;">Equipe Padre Constantino ❤️</p>', unsafe_allow_html=True)
