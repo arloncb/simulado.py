@@ -32,7 +32,7 @@ st.markdown("""
         text-align: center;
     }
 
-    /* 4. O CARD DO FORMULÁRIO (Efeito Vidro) */
+    /* 4. O CARD DO FORMULÁRIO */
     .stForm {
         background: rgba(255, 255, 255, 0.98) !important;
         padding: 40px !important;
@@ -50,7 +50,6 @@ st.markdown("""
         color: #000000 !important;
     }
     
-    /* Labels dos campos em Preto Sólido */
     .stTextInput label, .stSelectbox label, .stTextArea label {
         color: #000000 !important;
         font-size: 22px !important;
@@ -71,10 +70,6 @@ st.markdown("""
         box-shadow: 0 10px 20px rgba(79, 70, 229, 0.3);
         transition: all 0.3s ease;
     }
-    div.stButton > button:first-child:hover {
-        transform: translateY(-3px);
-        background: linear-gradient(90deg, #4338ca 0%, #6d28d9 100%);
-    }
 
     /* 7. SUCESSO GIGANTE */
     .sucesso-gigante {
@@ -85,7 +80,6 @@ st.markdown("""
         text-align: center;
         font-size: 40px !important;
         font-weight: 900;
-        box-shadow: 0 20px 40px rgba(0,0,0,0.3);
     }
 
     /* 8. RODAPÉ */
@@ -96,7 +90,6 @@ st.markdown("""
         font-weight: bold;
         margin-top: 50px;
         padding: 30px;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
     }
     </style>
     """, unsafe_allow_html=True)
@@ -123,7 +116,6 @@ with st.form("form_questoes", clear_on_submit=True):
     st.markdown("### 📋 Identificação")
     prof = st.text_input("Nome do Professor (a):")
     
-    # LISTA ATUALIZADA DE DISCIPLINAS
     disc = st.selectbox("Disciplina:", [
         "Selecione...", 
         "Matemática", "Português", "História", "Geografia", "Ciências", 
@@ -134,7 +126,11 @@ with st.form("form_questoes", clear_on_submit=True):
     turma = st.text_input("Série e Letra (Ex: 7° A):")
 
     st.markdown("---")
-    st.markdown("### ❓ Questão")
+    st.markdown("### ❓ Elaboração da Questão")
+    
+    # NOVO CAMPO: Habilidade/Competência
+    hab = st.text_input("Habilidade ou Competência (BNCC):", placeholder="Ex: EF09MA01")
+    
     pergunta = st.text_area("Enunciado da Questão:", height=150)
     foto = st.file_uploader("Upload de Imagem (Opcional):", type=["png", "jpg", "jpeg"])
 
@@ -145,7 +141,7 @@ with st.form("form_questoes", clear_on_submit=True):
     alt_c = st.text_input("Alternativa C:")
     alt_d = st.text_input("Alternativa D:")
     alt_e = st.text_input("Alternativa E:")
-    gabarito = st.selectbox("Qual é a CORRETA?", ["A", "B", "C", "D", "E"])
+    gabarito = st.selectbox("Indique a alternativa CORRETA:", ["A", "B", "C", "D", "E"])
 
     enviar = st.form_submit_button("💾 SALVAR QUESTÃO AGORA")
 
@@ -155,15 +151,18 @@ with st.form("form_questoes", clear_on_submit=True):
         else:
             try:
                 dados_atuais = conn.read(worksheet="Página1", ttl=0)
+                
                 nova_questao = pd.DataFrame([{
                     "Data": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"),
                     "Professor (a)": prof,
                     "Disciplina": disc,
                     "Turma": turma,
+                    "Habilidade": hab, # Incluído no salvamento
                     "Pergunta": pergunta,
                     "A": alt_a, "B": alt_b, "C": alt_c, "D": alt_d, "E": alt_e,
                     "Correta": gabarito
                 }])
+                
                 df_final = pd.concat([dados_atuais, nova_questao], ignore_index=True)
                 conn.update(worksheet="Página1", data=df_final)
                 st.markdown('<div class="sucesso-gigante">✅ SALVO COM SUCESSO!</div>', unsafe_allow_html=True)
@@ -177,6 +176,7 @@ if pergunta:
     with st.container():
         st.markdown(f"""
         <div style="background-color: #ffffff; padding: 25px; border-left: 15px solid #4f46e5; border-radius: 15px; color: #000;">
+            <small style="color: #666;">Habilidade: {hab}</small><br>
             <strong style="font-size: 20px;">Questão:</strong><br>{pergunta}
         </div>
         """, unsafe_allow_html=True)
