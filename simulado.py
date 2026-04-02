@@ -6,21 +6,21 @@ from PIL import Image
 # 1. Configuração da Página
 st.set_page_config(page_title="Gerador de Simulados - Constantino", layout="centered", page_icon="📝")
 
-# --- ESTILO CSS AVANÇADO (Cores Vívidas e Contraste) ---
+# --- ESTILO CSS ATUALIZADO (Textos em Preto Sólido) ---
 st.markdown("""
     <style>
-    /* 1. Fundo com Degradê mais Escuro e Vívido */
+    /* 1. Fundo com Degradê Vívido */
     [data-testid="stAppViewContainer"] {
         background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
     }
 
-    /* 2. Ajuste do Cabeçalho e Títulos para Branco */
+    /* 2. Ajuste de Títulos para PRETO SÓLIDO */
     [data-testid="stHeader"] {
         background: rgba(0,0,0,0);
     }
-    h1, h3, .stSubheader {
-        color: white !important;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    h1, h3, .stSubheader, p {
+        color: #000000 !important;
+        text-shadow: none !important; /* Remove sombra para ficar sólido */
     }
 
     /* 3. Estilo do Card do Formulário */
@@ -32,11 +32,11 @@ st.markdown("""
         border: none !important;
     }
 
-    /* 4. Fontes e Labels dentro do Formulário */
+    /* 4. Fontes e Labels dentro do Formulário (Sempre escuros para leitura) */
     .stTextInput label, .stSelectbox label, .stTextArea label {
         font-size: 20px !important;
         font-weight: bold !important;
-        color: #1e3a8a !important;
+        color: #000000 !important;
     }
 
     /* 5. Alerta de Sucesso Vibrante */
@@ -52,15 +52,14 @@ st.markdown("""
         box-shadow: 0 4px 15px rgba(0,0,0,0.3);
     }
 
-    /* 6. Rodapé */
+    /* 6. Rodapé em PRETO SÓLIDO */
     .rodape {
         text-align: center;
-        color: #e2e8f0;
+        color: #000000 !important;
         font-style: italic;
         margin-top: 60px;
         padding: 20px;
-        font-weight: 500;
-        text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        font-weight: bold;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -133,9 +132,8 @@ if pergunta:
     st.markdown("---")
     st.subheader("👀 Pré-visualização:")
     with st.container():
-        # Bloco que estava dando erro corrigido aqui:
         st.markdown(f"""
-        <div style="background-color: #fff; padding: 25px; border-left: 12px solid #1e3a8a; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); color: #2c3e50;">
+        <div style="background-color: #fff; padding: 25px; border-left: 12px solid #1e3a8a; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); color: #000000;">
             <strong style="font-size: 20px;">Questão:</strong><br>{pergunta}
         </div>
         """, unsafe_allow_html=True)
