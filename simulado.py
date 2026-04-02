@@ -9,7 +9,7 @@ st.set_page_config(page_title="Simulado Constantino - Premium", layout="centered
 # --- DESIGN TOTAL: CORES VIVAS, TEXTURAS E MODERNIDADE ---
 st.markdown("""
     <style>
-    /* 1. Fundo com Mesh Gradient Vibrante (Textura de Cores) */
+    /* 1. Fundo com Mesh Gradient Vibrante */
     [data-testid="stAppViewContainer"] {
         background-color: #1e1b4b;
         background-image: 
@@ -23,46 +23,44 @@ st.markdown("""
     /* 2. Cabeçalho Transparente */
     [data-testid="stHeader"] { background: rgba(0,0,0,0); }
 
-    /* 3. Títulos em Branco (Contraste Máximo com o Fundo Vibrante) */
+    /* 3. Títulos em Branco com Sombra */
     h1, h3, .stSubheader {
         color: #ffffff !important;
         font-family: 'Inter', sans-serif;
         font-weight: 800 !important;
         text-shadow: 3px 3px 6px rgba(0,0,0,0.4);
-        text-align: center;
     }
 
-    /* 4. O CARD DO FORMULÁRIO (Efeito Vidro Moderno) */
+    /* 4. O CARD DO FORMULÁRIO (Efeito Vidro) */
     .stForm {
-        background: rgba(255, 255, 255, 0.95) !important;
-        padding: 50px !important;
+        background: rgba(255, 255, 255, 0.98) !important;
+        padding: 40px !important;
         border-radius: 30px !important;
         box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
-        border: 1px solid rgba(255, 255, 255, 0.3) !important;
+        border: none !important;
     }
 
     /* 5. CAMPOS DE DIGITAÇÃO MODERNOS */
     .stTextInput input, .stSelectbox [data-baseweb="select"], .stTextArea textarea {
         background-color: #f8fafc !important;
-        border: 2px solid #e2e8f0 !important;
+        border: 2px solid #cbd5e1 !important;
         border-radius: 12px !important;
         font-size: 18px !important;
-        color: #0f172a !important; /* Texto Preto Sólido dentro do card branco */
+        color: #000000 !important;
     }
     
-    /* Labels dos campos em Preto Sólido (Contraste com card branco) */
+    /* Labels dos campos em Preto Sólido */
     .stTextInput label, .stSelectbox label, .stTextArea label {
         color: #000000 !important;
         font-size: 22px !important;
         font-weight: 800 !important;
-        margin-bottom: 10px !important;
     }
 
-    /* 6. BOTÃO MODERNO E VIBRANTE */
+    /* 6. BOTÃO PREMIUM */
     div.stButton > button:first-child {
         width: 100%;
         background: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%);
-        color: white;
+        color: white !important;
         padding: 20px;
         font-size: 24px;
         font-weight: bold;
@@ -73,11 +71,10 @@ st.markdown("""
     }
     div.stButton > button:first-child:hover {
         transform: translateY(-3px);
-        box-shadow: 0 15px 25px rgba(79, 70, 229, 0.5);
         background: linear-gradient(90deg, #4338ca 0%, #6d28d9 100%);
     }
 
-    /* 7. ALERTA DE SUCESSO GIGANTE */
+    /* 7. SUCESSO GIGANTE */
     .sucesso-gigante {
         background: #10b981;
         color: white;
@@ -87,10 +84,9 @@ st.markdown("""
         font-size: 40px !important;
         font-weight: 900;
         box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-        border: 5px solid #059669;
     }
 
-    /* 8. RODAPÉ (Contraste com o fundo azul) */
+    /* 8. RODAPÉ */
     .rodape {
         text-align: center;
         color: #ffffff;
@@ -104,52 +100,51 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- LOGO ---
-col_logo, _ = st.columns([1, 2])
-with col_logo:
+try:
+    img_logo = Image.open("logo.png")
+    st.image(img_logo, width=220)
+except:
     try:
-        img_logo = Image.open("logo.png")
+        img_logo = Image.open("logo.jpg")
         st.image(img_logo, width=220)
     except:
-        try:
-            img_logo = Image.open("logo.jpg")
-            st.image(img_logo, width=220)
-        except:
-            pass
+        pass
 
 st.title("📝 Portal do Professor")
 st.subheader("Simulados - Escola Padre Constantino")
-st.markdown("<br>", unsafe_allow_html=True)
 
 # 2. Conexão
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # 3. Formulário Principal
 with st.form("form_questoes", clear_on_submit=True):
-    st.markdown("### 📋 Identificação do Professor")
+    st.markdown("### 📋 Identificação")
     prof = st.text_input("Nome do Professor (a):")
     disc = st.selectbox("Disciplina:", ["Selecione...", "Matemática", "Português", "História", "Geografia", "Ciências", "Inglês", "Artes", "Ed. Física"])
     turma = st.text_input("Série e Letra (Ex: 7° A):")
 
-    st.markdown("<br>### ❓ Elaboração da Questão", unsafe_allow_html=True)
+    st.markdown("---")
+    st.markdown("### ❓ Questão")
     pergunta = st.text_area("Enunciado da Questão:", height=150)
-    foto = st.file_uploader("Upload de Imagem ou Gráfico (Opcional):", type=["png", "jpg", "jpeg"])
+    foto = st.file_uploader("Upload de Imagem (Opcional):", type=["png", "jpg", "jpeg"])
 
-    st.markdown("<br>### 🔘 Alternativas e Gabarito", unsafe_allow_html=True)
+    st.markdown("---")
+    st.markdown("### 🔘 Alternativas")
     alt_a = st.text_input("Alternativa A:")
     alt_b = st.text_input("Alternativa B:")
     alt_c = st.text_input("Alternativa C:")
     alt_d = st.text_input("Alternativa D:")
     alt_e = st.text_input("Alternativa E:")
-    gabarito = st.selectbox("Indique a alternativa CORRETA:", ["A", "B", "C", "D", "E"])
+    gabarito = st.selectbox("Qual é a CORRETA?", ["A", "B", "C", "D", "E"])
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    enviar = st.form_submit_button("💾 FINALIZAR E SALVAR QUESTÃO")
+    enviar = st.form_submit_button("💾 SALVAR QUESTÃO AGORA")
 
     if enviar:
         if not prof or disc == "Selecione..." or not turma or not pergunta:
-            st.error("🚨 ATENÇÃO: Preencha todos os campos obrigatórios antes de salvar!")
+            st.error("🚨 Atenção: Preencha todos os campos obrigatórios!")
         else:
             try:
+                # Lógica de salvamento
                 dados_atuais = conn.read(worksheet="Página1", ttl=0)
                 nova_questao = pd.DataFrame([{
                     "Data": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"),
@@ -160,4 +155,28 @@ with st.form("form_questoes", clear_on_submit=True):
                     "A": alt_a, "B": alt_b, "C": alt_c, "D": alt_d, "E": alt_e,
                     "Correta": gabarito
                 }])
-                df_
+                df_final = pd.concat([dados_atuais, nova_questao], ignore_index=True)
+                conn.update(worksheet="Página1", data=df_final)
+                st.markdown('<div class="sucesso-gigante">✅ SALVO COM SUCESSO!</div>', unsafe_allow_html=True)
+                st.balloons()
+            except Exception as e:
+                st.error(f"Erro técnico ao salvar: {e}")
+
+# --- 4. PRÉ-VISUALIZAÇÃO ---
+if pergunta:
+    st.markdown("<br><h3 style='color:white;'>👀 Pré-visualização:</h3>", unsafe_allow_html=True)
+    with st.container():
+        st.markdown(f"""
+        <div style="background-color: #ffffff; padding: 25px; border-left: 15px solid #4f46e5; border-radius: 15px; color: #000;">
+            <strong style="font-size: 20px;">Questão:</strong><br>{pergunta}
+        </div>
+        """, unsafe_allow_html=True)
+        if foto: st.image(foto, use_container_width=True)
+        st.markdown(f"""
+        <div style="color: white; font-size: 20px; font-weight: bold; margin-top: 15px;">
+            a) {alt_a}<br>b) {alt_b}<br>c) {alt_c}<br>d) {alt_d}<br>e) {alt_e}
+        </div>
+        """, unsafe_allow_html=True)
+
+# --- 5. RODAPÉ ---
+st.markdown('<div class="rodape">Feito com carinho pela Equipe Padre Constantino ❤️</div>', unsafe_allow_html=True)
