@@ -5,8 +5,13 @@ from PIL import Image
 import requests
 import base64
 
-# 1. CONFIGURAÇÃO DA PÁGINA
-st.set_page_config(page_title="Portal Simulado - Constantino", layout="wide", page_icon="📝")
+# 1. CONFIGURAÇÃO DA PÁGINA (Sidebar configurada para auto-recolher)
+st.set_page_config(
+    page_title="Portal Simulado - Constantino", 
+    layout="wide", 
+    page_icon="📝",
+    initial_sidebar_state="collapsed"
+)
 
 # --- DADOS DO GITHUB ---
 GITHUB_USER = "arloncb" 
@@ -15,7 +20,7 @@ GITHUB_REPO = "simulado.py"
 try:
     GITHUB_TOKEN = st.secrets["github_token"]
 except:
-    st.error("❌ Erro: 'github_token' não encontrado nos Secrets do Streamlit.")
+    st.error("❌ Erro: 'github_token' não encontrado nos Secrets.")
     st.stop()
 
 # --- CONEXÃO COM PLANILHA ---
@@ -35,57 +40,127 @@ def upload_to_github(file, filename):
         return ""
     except: return ""
 
-# --- DESIGN CSS ---
+# --- DESIGN PREMIUM: CORES VIVAS E CONTRASTE ALTO ---
 st.markdown("""
     <style>
-    [data-testid="stAppViewContainer"] { background: linear-gradient(135deg, #1e1b4b 0%, #3b82f6 100%); background-attachment: fixed; }
-    .stForm { background: white !important; padding: 30px !important; border-radius: 20px !important; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
-    .stTextInput label, .stSelectbox label, .stTextArea label { color: black !important; font-weight: bold !important; }
-    h1, h2, h3 { color: white !important; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+    /* Fundo com Mesh Gradient Vibrante */
+    [data-testid="stAppViewContainer"] {
+        background-color: #1e1b4b;
+        background-image: 
+            radial-gradient(at 0% 0%, rgba(79, 70, 229, 0.8) 0, transparent 50%), 
+            radial-gradient(at 100% 0%, rgba(124, 58, 237, 0.8) 0, transparent 50%), 
+            radial-gradient(at 100% 100%, rgba(219, 39, 119, 0.8) 0, transparent 50%), 
+            radial-gradient(at 0% 100%, rgba(37, 99, 235, 0.8) 0, transparent 50%);
+        background-attachment: fixed;
+    }
+
+    /* Ajuste da Barra Lateral */
+    [data-testid="stSidebar"] {
+        background-color: rgba(30, 27, 75, 0.9) !important;
+    }
+
+    /* Card Branco de Alto Contraste */
+    .stForm {
+        background: rgba(255, 255, 255, 0.98) !important;
+        padding: 40px !important;
+        border-radius: 30px !important;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6) !important;
+        border: none !important;
+    }
+
+    /* Labels em Preto Puro para leitura fácil */
+    .stTextInput label, .stSelectbox label, .stTextArea label, .stFileUploader label {
+        color: #000000 !important;
+        font-size: 20px !important;
+        font-weight: 800 !important;
+        margin-bottom: 10px !important;
+    }
+
+    /* Títulos em Branco com Sombra */
+    h1, h2, h3, .stSubheader {
+        color: #ffffff !important;
+        font-weight: 900 !important;
+        text-shadow: 3px 3px 6px rgba(0,0,0,0.5);
+        text-align: center;
+    }
+
+    /* Botão Degradê Moderno */
+    div.stButton > button:first-child {
+        width: 100%;
+        background: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%);
+        color: white !important;
+        padding: 18px;
+        font-size: 22px;
+        font-weight: bold;
+        border-radius: 15px;
+        border: none;
+        box-shadow: 0 10px 20px rgba(79, 70, 229, 0.4);
+        transition: 0.3s ease;
+    }
+    div.stButton > button:first-child:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 15px 25px rgba(79, 70, 229, 0.6);
+    }
+
+    /* Estilo de Sucesso */
+    .sucesso-premium {
+        background: #10b981;
+        color: white;
+        padding: 30px;
+        border-radius: 20px;
+        text-align: center;
+        font-size: 32px;
+        font-weight: 900;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+    }
     </style>
     """, unsafe_allow_html=True)
 
 # --- MENU LATERAL ---
-st.sidebar.title("🧭 Navegação")
-pagina = st.sidebar.radio("Escolha a página:", ["📝 Enviar Questão", "📋 Área da Coordenação"])
+st.sidebar.markdown("<h2 style='color:white;'>Menu</h2>", unsafe_allow_html=True)
+pagina = st.sidebar.radio("Navegar para:", ["📝 Enviar Questão", "📋 Área da Coordenação"])
 
 # ==========================================
 # PÁGINA 1: ENVIO DE QUESTÕES
 # ==========================================
 if pagina == "📝 Enviar Questão":
     st.title("📝 Portal do Professor")
-    st.subheader("Envio de Questões - Escola Padre Constantino")
+    st.subheader("Escola Padre Constantino")
 
     with st.form("form_questoes", clear_on_submit=True):
-        st.markdown("### 📋 Identificação")
-        prof = st.text_input("Nome do Professor (a):")
-        disc = st.selectbox("Disciplina:", ["Selecione...", "Matemática", "Português", "História", "Geografia", "Ciências", "Biologia", "Química", "Física", "Sociologia", "Filosofia", "Inglês", "Artes", "Ed. Física"])
-        turma = st.text_input("Série e Letra (Ex: 7° A):")
-        hab = st.text_input("Habilidade ou Competência (BNCC):")
+        st.markdown("<h3 style='color:black !important; text-shadow:none;'>📋 Identificação</h3>", unsafe_allow_html=True)
+        col_id1, col_id2 = st.columns(2)
+        with col_id1:
+            prof = st.text_input("Nome do Professor (a):")
+            disc = st.selectbox("Disciplina:", ["Selecione...", "Matemática", "Português", "História", "Geografia", "Ciências", "Biologia", "Química", "Física", "Sociologia", "Filosofia", "Inglês", "Artes", "Ed. Física"])
+        with col_id2:
+            turma = st.text_input("Série e Letra (Ex: 7° A):")
+            hab = st.text_input("Habilidade BNCC:")
 
         st.markdown("---")
-        st.markdown("### ❓ Questão")
+        st.markdown("<h3 style='color:black !important; text-shadow:none;'>❓ Elaboração</h3>", unsafe_allow_html=True)
         pergunta = st.text_area("Enunciado da Questão:", height=150)
-        foto = st.file_uploader("Upload de Imagem (Opcional):", type=["png", "jpg", "jpeg"])
+        foto = st.file_uploader("Anexar Imagem (Opcional):", type=["png", "jpg", "jpeg"])
 
         st.markdown("---")
-        alt_a = st.text_input("A:")
-        alt_b = st.text_input("B:")
-        alt_c = st.text_input("C:")
-        alt_d = st.text_input("D:")
-        alt_e = st.text_input("E:")
-        gabarito = st.selectbox("Qual é a CORRETA?", ["A", "B", "C", "D", "E"])
+        st.markdown("<h3 style='color:black !important; text-shadow:none;'>🔘 Alternativas</h3>", unsafe_allow_html=True)
+        alt_a = st.text_input("Alternativa A:")
+        alt_b = st.text_input("Alternativa B:")
+        alt_c = st.text_input("Alternativa C:")
+        alt_d = st.text_input("Alternativa D:")
+        alt_e = st.text_input("Alternativa E:")
+        gabarito = st.selectbox("Indique a alternativa CORRETA:", ["A", "B", "C", "D", "E"])
 
-        enviar = st.form_submit_button("💾 SALVAR QUESTÃO NO BANCO")
+        enviar = st.form_submit_button("💾 SALVAR QUESTÃO AGORA")
 
         if enviar:
             if not prof or disc == "Selecione..." or not turma or not pergunta:
-                st.error("🚨 Preencha todos os campos obrigatórios!")
+                st.error("🚨 Atenção: Preencha todos os campos obrigatórios!")
             else:
                 try:
                     link_img = ""
                     if foto:
-                        with st.spinner("Salvando imagem..."):
+                        with st.spinner("🚀 Enviando imagem ao servidor..."):
                             nome_f = f"{disc}_{turma}_{pd.Timestamp.now().strftime('%H%M%S')}.jpg".replace(" ", "_")
                             link_img = upload_to_github(foto, nome_f)
                     
@@ -98,59 +173,33 @@ if pagina == "📝 Enviar Questão":
                     }])
                     df_final = pd.concat([df_antigo, nova_linha], ignore_index=True)
                     conn.update(worksheet="Página1", data=df_final)
-                    st.success("✅ QUESTÃO SALVA COM SUCESSO!")
+                    st.markdown('<div class="sucesso-premium">✅ SALVO COM SUCESSO!</div>', unsafe_allow_html=True)
                     st.balloons()
                 except Exception as e:
-                    st.error(f"Erro ao salvar: {e}")
+                    st.error(f"Erro técnico: {e}")
 
 # ==========================================
 # PÁGINA 2: ÁREA DA COORDENAÇÃO
 # ==========================================
 else:
     st.title("📋 Área Pedagógica")
-    senha = st.text_input("Digite a senha de acesso:", type="password")
+    
+    col_lock, col_pass, col_lock2 = st.columns([1,2,1])
+    with col_pass:
+        senha = st.text_input("Chave de Acesso:", type="password")
     
     if senha == "constantino2026":
-        st.success("Acesso autorizado!")
-        
-        # BUSCA DADOS E LIMPA OS 'NaN' (O PULO DO GATO ESTÁ AQUI)
+        st.success("Acesso Liberado")
         df_raw = conn.read(worksheet="Página1", ttl=0)
-        df = df_raw.fillna("") # Transforma vazios em strings vazias
+        df = df_raw.fillna("") 
         
         if not df.empty:
-            # Filtros
-            col1, col2 = st.columns(2)
-            with col1:
-                f_disc = st.multiselect("Filtrar Disciplina:", df["Disciplina"].unique())
-            with col2:
-                f_turma = st.multiselect("Filtrar Turma:", df["Turma"].unique())
+            st.markdown("### 🔍 Filtros de Busca")
+            c1, c2 = st.columns(2)
+            with c1:
+                f_disc = st.multiselect("Por Disciplina:", df["Disciplina"].unique())
+            with c2:
+                f_turma = st.multiselect("Por Turma:", df["Turma"].unique())
             
             df_filtrado = df.copy()
-            if f_disc: df_filtrado = df_filtrado[df_filtrado["Disciplina"].isin(f_disc)]
-            if f_turma: df_filtrado = df_filtrado[df_filtrado["Turma"].isin(f_turma)]
-
-            st.dataframe(df_filtrado, use_container_width=True)
-            
-            # Download
-            csv = df_filtrado.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Baixar Planilha Filtrada", csv, "simulado.csv", "text/csv")
-            
-            st.markdown("---")
-            st.subheader("🔍 Visualização das Questões")
-            for i, row in df_filtrado.iterrows():
-                with st.expander(f"{row['Disciplina']} - {row['Turma']} (Prof. {row['Professor (a)']})"):
-                    st.write(f"**BNCC:** {row['Habilidade']}")
-                    st.write(f"**Enunciado:** {row['Pergunta']}")
-                    
-                    # Checagem reforçada para evitar o erro do print
-                    if row['Link Imagem'] and str(row['Link Imagem']).startswith("http"):
-                        st.image(row['Link Imagem'], width=400)
-                    
-                    st.write(f"a) {row['A']} | b) {row['B']} | c) {row['C']} | d) {row['D']} | e) {row['E']}")
-                    st.success(f"Gabarito: {row['Correta']}")
-        else:
-            st.info("Nenhuma questão cadastrada ainda.")
-    elif senha != "":
-        st.error("Senha incorreta!")
-
-st.markdown('<br><p style="text-align:center; color:white;">Equipe Padre Constantino ❤️</p>', unsafe_allow_html=True)
+            if f_disc
