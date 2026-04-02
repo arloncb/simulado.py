@@ -8,7 +8,7 @@ import base64
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Portal Simulado - Constantino", layout="wide", page_icon="📝")
 
-# --- DADOS DO GITHUB (Ajustado conforme seu print) ---
+# --- DADOS DO GITHUB ---
 GITHUB_USER = "arloncb" 
 GITHUB_REPO = "simulado.py" 
 
@@ -112,7 +112,10 @@ else:
     
     if senha == "constantino2026":
         st.success("Acesso autorizado!")
-        df = conn.read(worksheet="Página1", ttl=0)
+        
+        # BUSCA DADOS E LIMPA OS 'NaN' (O PULO DO GATO ESTÁ AQUI)
+        df_raw = conn.read(worksheet="Página1", ttl=0)
+        df = df_raw.fillna("") # Transforma vazios em strings vazias
         
         if not df.empty:
             # Filtros
@@ -138,8 +141,11 @@ else:
                 with st.expander(f"{row['Disciplina']} - {row['Turma']} (Prof. {row['Professor (a)']})"):
                     st.write(f"**BNCC:** {row['Habilidade']}")
                     st.write(f"**Enunciado:** {row['Pergunta']}")
-                    if row['Link Imagem']:
+                    
+                    # Checagem reforçada para evitar o erro do print
+                    if row['Link Imagem'] and str(row['Link Imagem']).startswith("http"):
                         st.image(row['Link Imagem'], width=400)
+                    
                     st.write(f"a) {row['A']} | b) {row['B']} | c) {row['C']} | d) {row['D']} | e) {row['E']}")
                     st.success(f"Gabarito: {row['Correta']}")
         else:
