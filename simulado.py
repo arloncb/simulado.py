@@ -14,7 +14,7 @@ st.markdown("""
         background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
     }
 
-    /* 2. Ajuste do Cabeçalho e Títulos para Branco (para destacar no fundo escuro) */
+    /* 2. Ajuste do Cabeçalho e Títulos para Branco */
     [data-testid="stHeader"] {
         background: rgba(0,0,0,0);
     }
@@ -23,7 +23,7 @@ st.markdown("""
         text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
     }
 
-    /* 3. Estilo do Card do Formulário (Contraste Máximo) */
+    /* 3. Estilo do Card do Formulário */
     .stForm {
         background-color: #ffffff !important;
         padding: 40px !important;
@@ -36,13 +36,13 @@ st.markdown("""
     .stTextInput label, .stSelectbox label, .stTextArea label {
         font-size: 20px !important;
         font-weight: bold !important;
-        color: #1e3a8a !important; /* Azul escuro nos textos internos */
+        color: #1e3a8a !important;
     }
 
     /* 5. Alerta de Sucesso Vibrante */
     .sucesso-gigante {
         padding: 40px;
-        background-color: #059669; /* Verde Esmeralda */
+        background-color: #059669;
         color: white;
         border-radius: 20px;
         text-align: center;
@@ -52,7 +52,7 @@ st.markdown("""
         box-shadow: 0 4px 15px rgba(0,0,0,0.3);
     }
 
-    /* 6. Rodapé (Claro para ler sobre o azul) */
+    /* 6. Rodapé */
     .rodape {
         text-align: center;
         color: #e2e8f0;
@@ -128,9 +128,24 @@ with st.form("form_questoes", clear_on_submit=True):
             except Exception as e:
                 st.error(f"Erro ao salvar: {e}")
 
-# --- 4. PRÉ-VISUALIZAÇÃO (Estilo Papel) ---
+# --- 4. PRÉ-VISUALIZAÇÃO ---
 if pergunta:
     st.markdown("---")
     st.subheader("👀 Pré-visualização:")
     with st.container():
+        # Bloco que estava dando erro corrigido aqui:
         st.markdown(f"""
+        <div style="background-color: #fff; padding: 25px; border-left: 12px solid #1e3a8a; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); color: #2c3e50;">
+            <strong style="font-size: 20px;">Questão:</strong><br>{pergunta}
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if foto: st.image(foto)
+        st.write(f"**a)** {alt_a}")
+        st.write(f"**b)** {alt_b}")
+        st.write(f"**c)** {alt_c}")
+        st.write(f"**d)** {alt_d}")
+        st.write(f"**e)** {alt_e}")
+
+# --- 5. RODAPÉ ---
+st.markdown('<div class="rodape">Feito com carinho pela Equipe Padre Constantino ❤️</div>', unsafe_allow_html=True)
