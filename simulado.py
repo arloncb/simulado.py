@@ -29,6 +29,7 @@ st.markdown("""
         font-family: 'Inter', sans-serif;
         font-weight: 800 !important;
         text-shadow: 3px 3px 6px rgba(0,0,0,0.4);
+        text-align: center;
     }
 
     /* 4. O CARD DO FORMULÁRIO (Efeito Vidro) */
@@ -54,6 +55,7 @@ st.markdown("""
         color: #000000 !important;
         font-size: 22px !important;
         font-weight: 800 !important;
+        margin-bottom: 10px !important;
     }
 
     /* 6. BOTÃO PREMIUM */
@@ -120,7 +122,15 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 with st.form("form_questoes", clear_on_submit=True):
     st.markdown("### 📋 Identificação")
     prof = st.text_input("Nome do Professor (a):")
-    disc = st.selectbox("Disciplina:", ["Selecione...", "Matemática", "Português", "História", "Geografia", "Ciências", "Inglês", "Artes", "Ed. Física"])
+    
+    # LISTA ATUALIZADA DE DISCIPLINAS
+    disc = st.selectbox("Disciplina:", [
+        "Selecione...", 
+        "Matemática", "Português", "História", "Geografia", "Ciências", 
+        "Biologia", "Química", "Física", "Sociologia", "Filosofia",
+        "Inglês", "Artes", "Ed. Física"
+    ])
+    
     turma = st.text_input("Série e Letra (Ex: 7° A):")
 
     st.markdown("---")
@@ -144,7 +154,6 @@ with st.form("form_questoes", clear_on_submit=True):
             st.error("🚨 Atenção: Preencha todos os campos obrigatórios!")
         else:
             try:
-                # Lógica de salvamento
                 dados_atuais = conn.read(worksheet="Página1", ttl=0)
                 nova_questao = pd.DataFrame([{
                     "Data": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"),
