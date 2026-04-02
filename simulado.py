@@ -18,7 +18,7 @@ with st.form("form_questoes", clear_on_submit=True):
     
     col1, col2, col3 = st.columns([2, 2, 1])
     with col1:
-        prof = st.text_input("Nome do Professor:")
+        prof = st.text_input("Nome do Professor (a) :")
     with col2:
         disc = st.selectbox("Disciplina:", ["Matemática", "Português", "História", "Geografia", "Ciências", "Inglês", "Artes", "Ed. Física"])
     with col3:
