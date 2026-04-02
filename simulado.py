@@ -164,4 +164,4 @@ else:
         else: st.info("O banco de dados está vazio.")
     elif st.session_state.get('p_fixo') == "ERRO": st.error("Senha incorreta!")
 
-st.markdown('<br><p style="text-align:center; color:white;">Equipe Padre Constantino ❤️</p>', unsafe_allow_html=True)
+st.markdown('<br><p style="text-align:center; color:white;">Feito com dedicação Equipe Padre Constantino ❤️</p>', unsafe_allow_html=True)
