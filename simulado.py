@@ -5,7 +5,7 @@ from PIL import Image
 import requests
 import base64
 
-# 1. CONFIGURAÇÃO DA PÁGINA (Sidebar configurada para auto-recolher)
+# 1. CONFIGURAÇÃO DA PÁGINA (Barra lateral inicia recolhida)
 st.set_page_config(
     page_title="Portal Simulado - Constantino", 
     layout="wide", 
@@ -38,7 +38,8 @@ def upload_to_github(file, filename):
         if res.status_code in [200, 201]:
             return f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/main/{path}"
         return ""
-    except: return ""
+    except: 
+        return ""
 
 # --- DESIGN PREMIUM: CORES VIVAS E CONTRASTE ALTO ---
 st.markdown("""
@@ -54,26 +55,19 @@ st.markdown("""
         background-attachment: fixed;
     }
 
-    /* Ajuste da Barra Lateral */
-    [data-testid="stSidebar"] {
-        background-color: rgba(30, 27, 75, 0.9) !important;
-    }
-
     /* Card Branco de Alto Contraste */
     .stForm {
         background: rgba(255, 255, 255, 0.98) !important;
         padding: 40px !important;
         border-radius: 30px !important;
         box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6) !important;
-        border: none !important;
     }
 
-    /* Labels em Preto Puro para leitura fácil */
+    /* Labels em Preto Puro */
     .stTextInput label, .stSelectbox label, .stTextArea label, .stFileUploader label {
         color: #000000 !important;
-        font-size: 20px !important;
+        font-size: 18px !important;
         font-weight: 800 !important;
-        margin-bottom: 10px !important;
     }
 
     /* Títulos em Branco com Sombra */
@@ -89,29 +83,23 @@ st.markdown("""
         width: 100%;
         background: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%);
         color: white !important;
-        padding: 18px;
-        font-size: 22px;
+        padding: 15px;
+        font-size: 20px;
         font-weight: bold;
-        border-radius: 15px;
+        border-radius: 12px;
         border: none;
-        box-shadow: 0 10px 20px rgba(79, 70, 229, 0.4);
         transition: 0.3s ease;
     }
-    div.stButton > button:first-child:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 15px 25px rgba(79, 70, 229, 0.6);
-    }
-
+    
     /* Estilo de Sucesso */
     .sucesso-premium {
         background: #10b981;
         color: white;
-        padding: 30px;
-        border-radius: 20px;
+        padding: 25px;
+        border-radius: 15px;
         text-align: center;
-        font-size: 32px;
+        font-size: 28px;
         font-weight: 900;
-        box-shadow: 0 10px 20px rgba(0,0,0,0.2);
     }
     </style>
     """, unsafe_allow_html=True)
@@ -144,12 +132,15 @@ if pagina == "📝 Enviar Questão":
 
         st.markdown("---")
         st.markdown("<h3 style='color:black !important; text-shadow:none;'>🔘 Alternativas</h3>", unsafe_allow_html=True)
-        alt_a = st.text_input("Alternativa A:")
-        alt_b = st.text_input("Alternativa B:")
-        alt_c = st.text_input("Alternativa C:")
-        alt_d = st.text_input("Alternativa D:")
-        alt_e = st.text_input("Alternativa E:")
-        gabarito = st.selectbox("Indique a alternativa CORRETA:", ["A", "B", "C", "D", "E"])
+        c_alt1, c_alt2 = st.columns(2)
+        with c_alt1:
+            alt_a = st.text_input("Alternativa A:")
+            alt_b = st.text_input("Alternativa B:")
+            alt_c = st.text_input("Alternativa C:")
+        with c_alt2:
+            alt_d = st.text_input("Alternativa D:")
+            alt_e = st.text_input("Alternativa E:")
+            gabarito = st.selectbox("Qual é a CORRETA?", ["A", "B", "C", "D", "E"])
 
         enviar = st.form_submit_button("💾 SALVAR QUESTÃO AGORA")
 
@@ -160,7 +151,7 @@ if pagina == "📝 Enviar Questão":
                 try:
                     link_img = ""
                     if foto:
-                        with st.spinner("🚀 Enviando imagem ao servidor..."):
+                        with st.spinner("🚀 Enviando imagem..."):
                             nome_f = f"{disc}_{turma}_{pd.Timestamp.now().strftime('%H%M%S')}.jpg".replace(" ", "_")
                             link_img = upload_to_github(foto, nome_f)
                     
@@ -202,4 +193,12 @@ else:
                 f_turma = st.multiselect("Por Turma:", df["Turma"].unique())
             
             df_filtrado = df.copy()
-            if f_disc
+            if f_disc:
+                df_filtrado = df_filtrado[df_filtrado["Disciplina"].isin(f_disc)]
+            if f_turma:
+                df_filtrado = df_filtrado[df_filtrado["Turma"].isin(f_turma)]
+
+            st.dataframe(df_filtrado, use_container_width=True)
+            
+            csv = df_filtrado.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Baixar Planilha",
