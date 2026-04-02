@@ -4,110 +4,150 @@ from streamlit_gsheets import GSheetsConnection
 from PIL import Image
 
 # 1. Configuração da Página
-st.set_page_config(page_title="Gerador de Simulados - Constantino", layout="centered", page_icon="📝")
+st.set_page_config(page_title="Simulado Constantino - Premium", layout="centered", page_icon="📝")
 
-# --- ESTILO CSS ATUALIZADO (Textos em Preto Sólido) ---
+# --- DESIGN TOTAL: CORES VIVAS, TEXTURAS E MODERNIDADE ---
 st.markdown("""
     <style>
-    /* 1. Fundo com Degradê Vívido */
+    /* 1. Fundo com Mesh Gradient Vibrante (Textura de Cores) */
     [data-testid="stAppViewContainer"] {
-        background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+        background-color: #1e1b4b;
+        background-image: 
+            radial-gradient(at 0% 0%, rgba(79, 70, 229, 0.8) 0, transparent 50%), 
+            radial-gradient(at 100% 0%, rgba(124, 58, 237, 0.8) 0, transparent 50%), 
+            radial-gradient(at 100% 100%, rgba(219, 39, 119, 0.8) 0, transparent 50%), 
+            radial-gradient(at 0% 100%, rgba(37, 99, 235, 0.8) 0, transparent 50%);
+        background-attachment: fixed;
     }
 
-    /* 2. Ajuste de Títulos para PRETO SÓLIDO */
-    [data-testid="stHeader"] {
-        background: rgba(0,0,0,0);
-    }
-    h1, h3, .stSubheader, p {
-        color: #000000 !important;
-        text-shadow: none !important; /* Remove sombra para ficar sólido */
+    /* 2. Cabeçalho Transparente */
+    [data-testid="stHeader"] { background: rgba(0,0,0,0); }
+
+    /* 3. Títulos em Branco (Contraste Máximo com o Fundo Vibrante) */
+    h1, h3, .stSubheader {
+        color: #ffffff !important;
+        font-family: 'Inter', sans-serif;
+        font-weight: 800 !important;
+        text-shadow: 3px 3px 6px rgba(0,0,0,0.4);
+        text-align: center;
     }
 
-    /* 3. Estilo do Card do Formulário */
+    /* 4. O CARD DO FORMULÁRIO (Efeito Vidro Moderno) */
     .stForm {
-        background-color: #ffffff !important;
-        padding: 40px !important;
-        border-radius: 25px !important;
-        box-shadow: 0 15px 35px rgba(0,0,0,0.4) !important;
-        border: none !important;
+        background: rgba(255, 255, 255, 0.95) !important;
+        padding: 50px !important;
+        border-radius: 30px !important;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+        border: 1px solid rgba(255, 255, 255, 0.3) !important;
     }
 
-    /* 4. Fontes e Labels dentro do Formulário (Sempre escuros para leitura) */
+    /* 5. CAMPOS DE DIGITAÇÃO MODERNOS */
+    .stTextInput input, .stSelectbox [data-baseweb="select"], .stTextArea textarea {
+        background-color: #f8fafc !important;
+        border: 2px solid #e2e8f0 !important;
+        border-radius: 12px !important;
+        font-size: 18px !important;
+        color: #0f172a !important; /* Texto Preto Sólido dentro do card branco */
+    }
+    
+    /* Labels dos campos em Preto Sólido (Contraste com card branco) */
     .stTextInput label, .stSelectbox label, .stTextArea label {
-        font-size: 20px !important;
-        font-weight: bold !important;
         color: #000000 !important;
+        font-size: 22px !important;
+        font-weight: 800 !important;
+        margin-bottom: 10px !important;
     }
 
-    /* 5. Alerta de Sucesso Vibrante */
-    .sucesso-gigante {
-        padding: 40px;
-        background-color: #059669;
+    /* 6. BOTÃO MODERNO E VIBRANTE */
+    div.stButton > button:first-child {
+        width: 100%;
+        background: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%);
         color: white;
+        padding: 20px;
+        font-size: 24px;
+        font-weight: bold;
+        border-radius: 15px;
+        border: none;
+        box-shadow: 0 10px 20px rgba(79, 70, 229, 0.3);
+        transition: all 0.3s ease;
+    }
+    div.stButton > button:first-child:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 15px 25px rgba(79, 70, 229, 0.5);
+        background: linear-gradient(90deg, #4338ca 0%, #6d28d9 100%);
+    }
+
+    /* 7. ALERTA DE SUCESSO GIGANTE */
+    .sucesso-gigante {
+        background: #10b981;
+        color: white;
+        padding: 40px;
         border-radius: 20px;
         text-align: center;
-        font-size: 35px !important;
-        font-weight: bold;
-        margin: 20px 0;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        font-size: 40px !important;
+        font-weight: 900;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        border: 5px solid #059669;
     }
 
-    /* 6. Rodapé em PRETO SÓLIDO */
+    /* 8. RODAPÉ (Contraste com o fundo azul) */
     .rodape {
         text-align: center;
-        color: #000000 !important;
-        font-style: italic;
-        margin-top: 60px;
-        padding: 20px;
+        color: #ffffff;
+        font-size: 20px;
         font-weight: bold;
+        margin-top: 50px;
+        padding: 30px;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
     }
     </style>
     """, unsafe_allow_html=True)
 
 # --- LOGO ---
-try:
-    img_logo = Image.open("logo.png")
-    st.image(img_logo, width=220)
-except:
+col_logo, _ = st.columns([1, 2])
+with col_logo:
     try:
-        img_logo = Image.open("logo.jpg")
+        img_logo = Image.open("logo.png")
         st.image(img_logo, width=220)
     except:
-        pass
+        try:
+            img_logo = Image.open("logo.jpg")
+            st.image(img_logo, width=220)
+        except:
+            pass
 
 st.title("📝 Portal do Professor")
 st.subheader("Simulados - Escola Padre Constantino")
-st.markdown("---")
+st.markdown("<br>", unsafe_allow_html=True)
 
 # 2. Conexão
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 3. Formulário
+# 3. Formulário Principal
 with st.form("form_questoes", clear_on_submit=True):
-    st.markdown("### 📋 Informações Básicas")
+    st.markdown("### 📋 Identificação do Professor")
     prof = st.text_input("Nome do Professor (a):")
     disc = st.selectbox("Disciplina:", ["Selecione...", "Matemática", "Português", "História", "Geografia", "Ciências", "Inglês", "Artes", "Ed. Física"])
     turma = st.text_input("Série e Letra (Ex: 7° A):")
 
-    st.markdown("---")
-    st.markdown("### ❓ Detalhes da Questão")
+    st.markdown("<br>### ❓ Elaboração da Questão", unsafe_allow_html=True)
     pergunta = st.text_area("Enunciado da Questão:", height=150)
-    foto = st.file_uploader("Upload de Imagem (Opcional):", type=["png", "jpg", "jpeg"])
+    foto = st.file_uploader("Upload de Imagem ou Gráfico (Opcional):", type=["png", "jpg", "jpeg"])
 
-    st.markdown("---")
-    st.markdown("### 🔘 Alternativas")
+    st.markdown("<br>### 🔘 Alternativas e Gabarito", unsafe_allow_html=True)
     alt_a = st.text_input("Alternativa A:")
     alt_b = st.text_input("Alternativa B:")
     alt_c = st.text_input("Alternativa C:")
     alt_d = st.text_input("Alternativa D:")
     alt_e = st.text_input("Alternativa E:")
-    gabarito = st.selectbox("Qual é a CORRETA?", ["A", "B", "C", "D", "E"])
+    gabarito = st.selectbox("Indique a alternativa CORRETA:", ["A", "B", "C", "D", "E"])
 
-    enviar = st.form_submit_button("💾 SALVAR QUESTÃO AGORA")
+    st.markdown("<br>", unsafe_allow_html=True)
+    enviar = st.form_submit_button("💾 FINALIZAR E SALVAR QUESTÃO")
 
     if enviar:
         if not prof or disc == "Selecione..." or not turma or not pergunta:
-            st.error("🚨 Atenção: Todos os campos obrigatórios precisam ser preenchidos!")
+            st.error("🚨 ATENÇÃO: Preencha todos os campos obrigatórios antes de salvar!")
         else:
             try:
                 dados_atuais = conn.read(worksheet="Página1", ttl=0)
@@ -120,30 +160,4 @@ with st.form("form_questoes", clear_on_submit=True):
                     "A": alt_a, "B": alt_b, "C": alt_c, "D": alt_d, "E": alt_e,
                     "Correta": gabarito
                 }])
-                df_final = pd.concat([dados_atuais, nova_questao], ignore_index=True)
-                conn.update(worksheet="Página1", data=df_final)
-                st.markdown('<div class="sucesso-gigante">✅ SALVO COM SUCESSO!</div>', unsafe_allow_html=True)
-                st.balloons()
-            except Exception as e:
-                st.error(f"Erro ao salvar: {e}")
-
-# --- 4. PRÉ-VISUALIZAÇÃO ---
-if pergunta:
-    st.markdown("---")
-    st.subheader("👀 Pré-visualização:")
-    with st.container():
-        st.markdown(f"""
-        <div style="background-color: #fff; padding: 25px; border-left: 12px solid #1e3a8a; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); color: #000000;">
-            <strong style="font-size: 20px;">Questão:</strong><br>{pergunta}
-        </div>
-        """, unsafe_allow_html=True)
-        
-        if foto: st.image(foto)
-        st.write(f"**a)** {alt_a}")
-        st.write(f"**b)** {alt_b}")
-        st.write(f"**c)** {alt_c}")
-        st.write(f"**d)** {alt_d}")
-        st.write(f"**e)** {alt_e}")
-
-# --- 5. RODAPÉ ---
-st.markdown('<div class="rodape">Feito com carinho pela Equipe Padre Constantino ❤️</div>', unsafe_allow_html=True)
+                df_
