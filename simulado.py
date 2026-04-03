@@ -55,8 +55,8 @@ def gerar_pdf_bytes(df_limpo):
     pdf.ln(10)
 
     for i, row in df_limpo.iterrows():
-        escrever_texto(f"QUESTÃO {i+1} | {row['Disciplina']} - {row['Turma']}", "B", 12)
-        escrever_texto(f"Código da Habilidade (Referencial Curricular de MS): {row['Habilidade']}", "I", 10)
+        escrever_texto(f"QUESTAO {i+1} | {row['Disciplina']} - {row['Turma']}", "B", 12)
+        escrever_texto(f"Codigo da Habilidade (Referencial Curricular de MS): {row['Habilidade']}", "I", 10)
         pdf.ln(2)
         escrever_texto(row['Pergunta'], "", 11)
         pdf.ln(4)
@@ -77,7 +77,7 @@ st.markdown("""
     .stTextInput label, .stSelectbox label, .stTextArea label { color: black !important; font-weight: bold !important; font-size: 16px !important; }
     div.stButton > button:first-child { width: 100%; background: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%); color: white !important; padding: 15px; border-radius: 12px; font-weight: bold; border: none; }
     .instrucao-foto { color: #1e1b4b; font-weight: bold; margin-bottom: -15px; font-size: 16px; }
-    .rodape-constantino { text-align: center; color: white; font-weight: bold; padding: 20px; font-size: 18px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+    .rodape-constantino { text-align: center; color: white; font-weight: bold; padding: 25px; font-size: 18px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
     </style>
     """, unsafe_allow_html=True)
 
@@ -103,40 +103,10 @@ if pagina == "📝 Enviar Questão":
             disc = st.selectbox("Sua Disciplina:", ["Selecione...", "Matemática", "Português", "História", "Geografia", "Ciências", "Biologia", "Química", "Física", "Sociologia", "Filosofia", "Inglês", "Artes", "Ed. Física"], key="d_fixo")
         with c2:
             turma = st.text_input("Série/Turma:", key="t_fixo")
-            # --- MUDANÇA: REFERENCIAL MS ---
             hab = st.text_input("Código da Habilidade (Referencial Curricular de MS):", key=f"h_{st.session_state.limpar}")
 
         st.markdown("---")
         pergunta = st.text_area("Enunciado da Questão:", height=150, key=f"q_{st.session_state.limpar}")
         
-        # --- MUDANÇA: TEXTO SOBRE IMAGEM ---
         st.markdown('<p class="instrucao-foto">Adicione uma imagem em sua questão aqui:</p>', unsafe_allow_html=True)
         foto = st.file_uploader("", type=["png", "jpg", "jpeg"], key=f"f_{st.session_state.limpar}")
-        
-        st.markdown("---")
-        st.markdown("<h4 style='color:black;'>🔘 Alternativas</h4>", unsafe_allow_html=True)
-        a = st.text_input("A:", key=f"a_{st.session_state.limpar}")
-        b = st.text_input("B:", key=f"b_{st.session_state.limpar}")
-        c = st.text_input("C:", key=f"c_{st.session_state.limpar}")
-        d = st.text_input("D:", key=f"d_{st.session_state.limpar}")
-        e = st.text_input("E:", key=f"e_{st.session_state.limpar}")
-        gab = st.selectbox("Gabarito:", ["A", "B", "C", "D", "E"], key=f"g_{st.session_state.limpar}")
-
-        if st.form_submit_button("💾 SALVAR E CONTINUAR"):
-            if not prof or disc == "Selecione..." or not pergunta:
-                st.error("🚨 Preencha os campos obrigatórios!")
-            else:
-                img_url = upload_to_github(foto, f"{disc}_{pd.Timestamp.now().strftime('%H%M%S')}.jpg") if foto else ""
-                df_old = conn.read(worksheet="Página1", ttl=0)
-                nova = pd.DataFrame([{"Data": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Professor (a)": prof, "Disciplina": disc, "Turma": turma, "Habilidade": hab, "Pergunta": pergunta, "A": a, "B": b, "C": c, "D": d, "E": e, "Correta": gab, "Link Imagem": img_url}])
-                conn.update(worksheet="Página1", data=pd.concat([df_old, nova], ignore_index=True))
-                st.session_state.limpar += 1
-                st.success("✅ Salvo com sucesso!")
-                st.rerun()
-
-# ==========================================
-# PÁGINA 2: COORDENAÇÃO
-# ==========================================
-else:
-    st.title("📋 Área Pedagógica")
-    if st.text_input("Senha de Acesso:", type="password") == "constantino2026":
