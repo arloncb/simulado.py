@@ -76,7 +76,8 @@ st.markdown("""
     h1, h2, h3, .stSubheader { color: white !important; font-weight: 800 !important; text-align: center; }
     .stTextInput label, .stSelectbox label, .stTextArea label { color: black !important; font-weight: bold !important; font-size: 16px !important; }
     div.stButton > button:first-child { width: 100%; background: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%); color: white !important; padding: 15px; border-radius: 12px; font-weight: bold; border: none; }
-    .instrucao-foto { color: #1e1b4b; font-weight: bold; margin-bottom: -15px; }
+    .instrucao-foto { color: #1e1b4b; font-weight: bold; margin-bottom: -15px; font-size: 16px; }
+    .rodape-constantino { text-align: center; color: white; font-weight: bold; padding: 20px; font-size: 18px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
     </style>
     """, unsafe_allow_html=True)
 
@@ -84,7 +85,7 @@ st.markdown("""
 if 'limpar' not in st.session_state: st.session_state.limpar = 0
 
 # --- MENU ---
-st.sidebar.title("Menu")
+st.sidebar.title("Navegação")
 pagina = st.sidebar.radio("Ir para:", ["📝 Enviar Questão", "📋 Área da Coordenação"])
 
 # ==========================================
@@ -102,13 +103,13 @@ if pagina == "📝 Enviar Questão":
             disc = st.selectbox("Sua Disciplina:", ["Selecione...", "Matemática", "Português", "História", "Geografia", "Ciências", "Biologia", "Química", "Física", "Sociologia", "Filosofia", "Inglês", "Artes", "Ed. Física"], key="d_fixo")
         with c2:
             turma = st.text_input("Série/Turma:", key="t_fixo")
-            # --- MUDANÇA 1: NOME DA HABILIDADE ---
+            # --- MUDANÇA: REFERENCIAL MS ---
             hab = st.text_input("Código da Habilidade (Referencial Curricular de MS):", key=f"h_{st.session_state.limpar}")
 
         st.markdown("---")
         pergunta = st.text_area("Enunciado da Questão:", height=150, key=f"q_{st.session_state.limpar}")
         
-        # --- MUDANÇA 2: TEXTO SOBRE O UPLOAD ---
+        # --- MUDANÇA: TEXTO SOBRE IMAGEM ---
         st.markdown('<p class="instrucao-foto">Adicione uma imagem em sua questão aqui:</p>', unsafe_allow_html=True)
         foto = st.file_uploader("", type=["png", "jpg", "jpeg"], key=f"f_{st.session_state.limpar}")
         
@@ -124,3 +125,18 @@ if pagina == "📝 Enviar Questão":
         if st.form_submit_button("💾 SALVAR E CONTINUAR"):
             if not prof or disc == "Selecione..." or not pergunta:
                 st.error("🚨 Preencha os campos obrigatórios!")
+            else:
+                img_url = upload_to_github(foto, f"{disc}_{pd.Timestamp.now().strftime('%H%M%S')}.jpg") if foto else ""
+                df_old = conn.read(worksheet="Página1", ttl=0)
+                nova = pd.DataFrame([{"Data": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Professor (a)": prof, "Disciplina": disc, "Turma": turma, "Habilidade": hab, "Pergunta": pergunta, "A": a, "B": b, "C": c, "D": d, "E": e, "Correta": gab, "Link Imagem": img_url}])
+                conn.update(worksheet="Página1", data=pd.concat([df_old, nova], ignore_index=True))
+                st.session_state.limpar += 1
+                st.success("✅ Salvo com sucesso!")
+                st.rerun()
+
+# ==========================================
+# PÁGINA 2: COORDENAÇÃO
+# ==========================================
+else:
+    st.title("📋 Área Pedagógica")
+    if st.text_input("Senha de Acesso:", type="password") == "constantino2026":
