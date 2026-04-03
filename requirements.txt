@@ -4,3 +4,4 @@ st-gsheets-connection
 requests
 Pillow
 fpdf2
+python-docx
