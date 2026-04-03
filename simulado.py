@@ -128,14 +128,13 @@ if pagina == "📝 Enviar Questão":
     st.title("📝 SIMULADO - Lançamento de Questões")
     st.subheader("Escola Pe. Constantino")
 
-    with st.form("form_professor_v9"):
+    with st.form("form_professor_v10"):
         st.markdown("<h4 style='color:black;'>📋 Identificação</h4>", unsafe_allow_html=True)
         c1, c2 = st.columns(2)
         with c1:
             prof = st.text_input("Seu Nome:", key="p_fixo")
             disc = st.selectbox("Sua Disciplina:", ["Selecione...", "Matemática", "Português", "História", "Geografia", "Ciências", "Biologia", "Química", "Física", "Sociologia", "Filosofia", "Inglês", "Artes", "Ed. Física"], key="d_fixo")
         with c2:
-            # --- MUDANÇA AQUI: MENU CASCATA PARA TURMAS ---
             opcoes_turma = ["Selecione...", "4° ano", "5° ano", "6° ano", "7° ano", "8° ano", "9° ano", "1° ano EM", "2° ano EM", "3° ano"]
             turma = st.selectbox("Série/Turma:", opcoes_turma, key="t_fixo")
             hab = st.text_input("Código da Habilidade (Referencial Curricular de MS):", key=f"h_{st.session_state.limpar}")
@@ -156,7 +155,7 @@ if pagina == "📝 Enviar Questão":
 
         if st.form_submit_button("💾 SALVAR E CONTINUAR"):
             if not prof or disc == "Selecione..." or turma == "Selecione..." or not pergunta:
-                st.error("🚨 Preencha os campos obrigatórios (Nome, Disciplina, Turma e Enunciado)!")
+                st.error("🚨 Preencha os campos obrigatórios!")
             else:
                 with st.status("🚀 Processando lançamento...", expanded=True) as status:
                     img_url = upload_to_github(foto, f"{disc}_{pd.Timestamp.now().strftime('%H%M%S')}.jpg") if foto else ""
@@ -179,15 +178,41 @@ else:
         st.success("Acesso Autorizado")
         df = conn.read(worksheet="Página1", ttl=0).fillna("")
         if not df.empty:
+            # --- MENU DE ORDENAÇÃO ---
+            st.markdown("### ⚙️ Configurações do Documento")
+            col_ordem, col_vazia = st.columns([2, 2])
+            ordem_opção = col_ordem.selectbox(
+                "Organizar questões por:", 
+                ["Área de Conhecimento (Linguagens/Exatas/Humanas)", "Ordem Alfabética de Disciplina", "Professor (A-Z)", "Data de Envio (Mais recentes primeiro)"]
+            )
+
             c1, c2 = st.columns(2)
             f_d = c1.multiselect("Filtrar Disciplina:", df["Disciplina"].unique())
             f_t = c2.multiselect("Filtrar Turma:", df["Turma"].unique())
+            
             dff = df.copy()
             if f_d: dff = dff[dff["Disciplina"].isin(f_d)]
             if f_t: dff = dff[dff["Turma"].isin(f_t)]
-            dff = dff.sort_values(by=['Turma', 'Disciplina'])
-            st.dataframe(dff, use_container_width=True)
-            st.markdown("### 📥 Exportar Questões Filtradas")
+
+            # LÓGICA DE ORDENAÇÃO SELECIONADA
+            if ordem_opção == "Área de Conhecimento (Linguagens/Exatas/Humanas)":
+                ordem_custom = {
+                    "Português": 1, "Inglês": 2, "Artes": 3, "Ed. Física": 4, 
+                    "Matemática": 5, "Biologia": 6, "Física": 7, "Química": 8, "Ciências": 9,
+                    "História": 10, "Geografia": 11, "Sociologia": 12, "Filosofia": 13
+                }
+                dff['peso'] = dff['Disciplina'].map(ordem_custom).fillna(99)
+                dff = dff.sort_values(by=['Turma', 'peso', 'Disciplina'])
+            elif ordem_opção == "Professor (A-Z)":
+                dff = dff.sort_values(by=['Professor (a)', 'Turma', 'Disciplina'])
+            elif ordem_opção == "Data de Envio (Mais recentes primeiro)":
+                dff = dff.iloc[::-1] # Inverte a ordem do banco
+            else:
+                dff = dff.sort_values(by=['Turma', 'Disciplina'])
+
+            st.dataframe(dff.drop(columns=['peso'], errors='ignore'), use_container_width=True)
+            
+            st.markdown("### 📥 Exportar Questões Filtradas e Ordenadas")
             col_pdf, col_word, col_excel = st.columns(3)
             with col_pdf:
                 st.download_button(label="📄 Baixar PDF", data=gerar_pdf_bytes(dff), file_name="simulado_constantino.pdf", mime="application/pdf")
