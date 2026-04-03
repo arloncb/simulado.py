@@ -9,17 +9,11 @@ from fpdf import FPDF
 from docx import Document
 from docx.shared import Inches
 
-# 1. CONFIGURAÇÃO DA PÁGINA (Deve ser o primeiro comando)
-st.set_page_config(
-    page_title="Portal Simulado - Constantino", 
-    layout="wide", 
-    initial_sidebar_state="collapsed"
-)
+# 1. CONFIGURAÇÃO INICIAL (Obrigatório ser o primeiro comando)
+st.set_page_config(page_title="Portal Constantino", layout="wide", initial_sidebar_state="collapsed")
 
-# 2. CONEXÃO COM A PLANILHA
+# 2. CONEXÃO E CONFIGURAÇÕES
 conn = st.connection("gsheets", type=GSheetsConnection)
-
-# --- CONFIGURAÇÕES GITHUB ---
 GITHUB_USER = "arloncb" 
 GITHUB_REPO = "simulado.py" 
 
@@ -29,7 +23,7 @@ except:
     st.error("❌ Erro: Chave 'github_token' não encontrada nos Secrets.")
     st.stop()
 
-# --- FUNÇÃO UPLOAD GITHUB ---
+# --- FUNÇÕES DE APOIO ---
 def upload_to_github(file, filename):
     try:
         path = f"imagens/{filename}"
@@ -41,7 +35,6 @@ def upload_to_github(file, filename):
         return f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/main/{path}" if res.status_code in [200, 201] else ""
     except: return ""
 
-# --- FUNÇÃO GERADORA DE PDF ---
 def gerar_pdf_bytes(df_limpo):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -60,55 +53,54 @@ def gerar_pdf_bytes(df_limpo):
         escrever_texto(f"Habilidade: {row['Habilidade']}", "I", 10)
         pdf.ln(2)
         escrever_texto(row['Pergunta'], "", 11)
-        pdf.ln(2)
         link_img = row.get('Link Imagem', '')
         if link_img and str(link_img).startswith("http"):
             try:
                 response = requests.get(link_img)
                 if response.status_code == 200:
-                    img_data = io.BytesIO(response.content)
-                    pdf.image(img_data, x=15, w=100)
-                    pdf.ln(5)
+                    img_data = io.BytesIO(response.content); pdf.image(img_data, x=15, w=100); pdf.ln(5)
             except: pass
         for letra in ['A', 'B', 'C', 'D', 'E']:
             escrever_texto(f"{letra.lower()}) {row[letra]}", "", 11)
-        pdf.ln(10)
-        pdf.set_x(15)
-        pdf.line(15, pdf.get_y(), 195, pdf.get_y())
-        pdf.ln(8)
+        pdf.ln(10); pdf.set_x(15); pdf.line(15, pdf.get_y(), 195, pdf.get_y()); pdf.ln(8)
     return bytes(pdf.output())
 
-# --- FUNÇÃO GERADORA DE WORD ---
 def gerar_docx_bytes(df_limpo):
     doc = Document()
     doc.add_heading('Simulado - Escola Pe. Constantino', 0)
     for i, row in df_limpo.reset_index(drop=True).iterrows():
         doc.add_heading(f"QUESTAO {i+1} | {row['Disciplina']} - {row['Turma']}", level=2)
-        p_hab = doc.add_paragraph()
-        run_hab = p_hab.add_run(f"Habilidade: {row['Habilidade']}")
-        run_hab.italic = True
+        p_hab = doc.add_paragraph(); run_hab = p_hab.add_run(f"Habilidade: {row['Habilidade']}"); run_hab.italic = True
         doc.add_paragraph(row['Pergunta'])
         link_img = row.get('Link Imagem', '')
         if link_img and str(link_img).startswith("http"):
             try:
-                response = requests.get(link_img)
-                if response.status_code == 200:
-                    img_data = io.BytesIO(response.content)
-                    doc.add_picture(img_data, width=Inches(4))
+                res = requests.get(link_img)
+                if res.status_code == 200:
+                    img_io = io.BytesIO(res.content); doc.add_picture(img_io, width=Inches(4))
             except: pass
-        for letra in ['A', 'B', 'C', 'D', 'E']:
-            doc.add_paragraph(f"{letra.lower()}) {row[letra]}")
+        for letra in ['A', 'B', 'C', 'D', 'E']: doc.add_paragraph(f"{letra.lower()}) {row[letra]}")
         doc.add_paragraph("-" * 40)
-    bio = io.BytesIO()
-    doc.save(bio)
-    return bio.getvalue()
+    bio = io.BytesIO(); doc.save(bio); return bio.getvalue()
 
-# --- DESIGN PREMIUM (Aspas revisadas) ---
-st.markdown("""
+# --- DESIGN (Estilo simplificado para evitar erros de aspas) ---
+css = """
 <style>
 [data-testid="stAppViewContainer"] { background: linear-gradient(135deg, #1e1b4b 0%, #3b82f6 100%) fixed; }
-.stForm { background: rgba(255, 255, 255, 0.98) !important; padding: 40px !important; border-radius: 25px !important; box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
-h1, h2, h3, .stSubheader { color: white !important; font-weight: 800 !important; text-align: center; }
-.stTextInput label, .stSelectbox label, .stTextArea label { color: black !important; font-weight: bold !important; font-size: 16px !important; }
-div.stButton > button:first-child { width: 100%; background: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%); color: white !important; padding: 15px; border-radius: 12px; font-weight: bold; border: none; }
-.rodape-final { text-align: center; color: white; font-weight: bold; padding: 30px; font-size: 18px; text-shadow: 2
+.stForm { background: white !important; padding: 30px !important; border-radius: 20px !important; }
+h1, h2, h3 { color: white !important; text-align: center; }
+.stTextInput label, .stSelectbox label, .stTextArea label { color: black !important; font-weight: bold; }
+.rodape { text-align: center; color: white; padding: 20px; font-weight: bold; }
+</style>
+"""
+st.markdown(css, unsafe_allow_html=True)
+
+if 'limpar' not in st.session_state: st.session_state.limpar = 0
+
+pagina = st.sidebar.radio("Navegação:", ["📝 Enviar Questão", "📋 Área da Coordenação"])
+
+# ==========================================
+# PÁGINA 1: ENVIO
+# ==========================================
+if pagina == "📝 Enviar Questão":
+    st.title
