@@ -54,7 +54,7 @@ def gerar_pdf_bytes(df_limpo):
     pdf.cell(largura_util, 10, "Simulado - Escola Pe. Constantino", ln=True, align="C")
     pdf.ln(10)
 
-    for i, row in df_limpo.iterrows():
+    for i, row in df_limpo.reset_index(drop=True).iterrows():
         escrever_texto(f"QUESTÃO {i+1} | {row['Disciplina']} - {row['Turma']}", "B", 12)
         escrever_texto(f"Código da Habilidade (Referencial Curricular de MS): {row['Habilidade']}", "I", 10)
         pdf.ln(2)
@@ -68,7 +68,7 @@ def gerar_pdf_bytes(df_limpo):
         pdf.ln(8)
     return bytes(pdf.output())
 
-# --- DESIGN PREMIUM (Cuidado redobrado com as aspas aqui) ---
+# --- DESIGN PREMIUM ---
 st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] { background: linear-gradient(135deg, #1e1b4b 0%, #3b82f6 100%) fixed; }
@@ -81,10 +81,8 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- ESTADO DE SESSÃO ---
 if 'limpar' not in st.session_state: st.session_state.limpar = 0
 
-# --- MENU ---
 st.sidebar.title("Navegação")
 pagina = st.sidebar.radio("Ir para:", ["📝 Enviar Questão", "📋 Área da Coordenação"])
 
@@ -95,7 +93,7 @@ if pagina == "📝 Enviar Questão":
     st.title("📝 SIMULADO - Lançamento de Questões")
     st.subheader("Escola Pe. Constantino")
 
-    with st.form("form_final_v5"):
+    with st.form("form_professor_final"):
         st.markdown("<h4 style='color:black;'>📋 Identificação</h4>", unsafe_allow_html=True)
         c1, c2 = st.columns(2)
         with c1:
@@ -107,7 +105,6 @@ if pagina == "📝 Enviar Questão":
 
         st.markdown("---")
         pergunta = st.text_area("Enunciado da Questão:", height=150, key=f"q_{st.session_state.limpar}")
-        
         st.markdown('<p class="instrucao-foto">Adicione uma imagem em sua questão aqui:</p>', unsafe_allow_html=True)
         foto = st.file_uploader("", type=["png", "jpg", "jpeg"], key=f"f_{st.session_state.limpar}")
         
@@ -126,17 +123,7 @@ if pagina == "📝 Enviar Questão":
             else:
                 img_url = upload_to_github(foto, f"{disc}_{pd.Timestamp.now().strftime('%H%M%S')}.jpg") if foto else ""
                 df_old = conn.read(worksheet="Página1", ttl=0)
-                nova = pd.DataFrame([{
-                    "Data": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), 
-                    "Professor (a)": prof, 
-                    "Disciplina": disc, 
-                    "Turma": turma, 
-                    "Habilidade": hab, 
-                    "Pergunta": pergunta, 
-                    "A": a, "B": b, "C": c, "D": d, "E": e, 
-                    "Correta": gab, 
-                    "Link Imagem": img_url
-                }])
+                nova = pd.DataFrame([{"Data": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), "Professor (a)": prof, "Disciplina": disc, "Turma": turma, "Habilidade": hab, "Pergunta": pergunta, "A": a, "B": b, "C": c, "D": d, "E": e, "Correta": gab, "Link Imagem": img_url}])
                 conn.update(worksheet="Página1", data=pd.concat([df_old, nova], ignore_index=True))
                 st.session_state.limpar += 1
                 st.success("✅ Salvo com sucesso!")
@@ -161,12 +148,17 @@ else:
             if f_d: dff = dff[dff["Disciplina"].isin(f_d)]
             if f_t: dff = dff[dff["Turma"].isin(f_t)]
             
+            # --- O PULO DO GATO: Ordenação para o PDF ---
+            # Ordena por Turma e depois por Disciplina para que o PDF saia organizado
+            dff = dff.sort_values(by=['Turma', 'Disciplina'])
+            
             st.dataframe(dff, use_container_width=True)
             
             st.markdown("### 📥 Exportar")
             col_pdf, col_csv = st.columns(2)
             with col_pdf:
-                st.download_button(label="📄 Baixar Simulado (PDF)", data=gerar_pdf_bytes(dff), file_name="simulado_constantino.pdf", mime="application/pdf")
+                # O PDF agora levará as questões filtradas e ORDENADAS
+                st.download_button(label="📄 Baixar Simulado Filtrado (PDF)", data=gerar_pdf_bytes(dff), file_name="simulado_constantino.pdf", mime="application/pdf")
             with col_csv:
                 st.download_button(label="📊 Baixar Excel (CSV)", data=dff.to_csv(index=False).encode('utf-8'), file_name="simulado.csv", mime="text/csv")
         else:
@@ -174,5 +166,4 @@ else:
     elif senha != "":
         st.error("Senha incorreta!")
 
-# RODAPÉ SEMPRE VISÍVEL
 st.markdown('<div class="rodape-final">Feito com carinho pela Equipe Pe. Constantino ❤️</div>', unsafe_allow_html=True)
