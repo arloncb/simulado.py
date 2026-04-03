@@ -9,14 +9,14 @@ from fpdf import FPDF
 from docx import Document
 from docx.shared import Inches
 
-# 1. CONFIGURAÇÃO DA PÁGINA (Sempre o primeiro comando)
+# 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(
     page_title="Portal Simulado - Constantino", 
     layout="wide", 
     initial_sidebar_state="collapsed"
 )
 
-# 2. CONEXÃO GLOBAL
+# 2. CONEXÃO COM A PLANILHA (Definido no topo)
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # --- CONFIGURAÇÕES GITHUB ---
@@ -128,7 +128,7 @@ if pagina == "📝 Enviar Questão":
     st.title("📝 SIMULADO - Lançamento de Questões")
     st.subheader("Escola Pe. Constantino")
 
-    with st.form("form_v13"):
+    with st.form("form_professor_v14"):
         st.markdown("<h4 style='color:black;'>📋 Identificação</h4>", unsafe_allow_html=True)
         c1, c2 = st.columns(2)
         with c1:
@@ -165,46 +165,4 @@ if pagina == "📝 Enviar Questão":
                     status.update(label="✅ Questão enviada com sucesso!", state="complete", expanded=False)
                 st.toast("Sucesso! Próxima questão...", icon='📝')
                 time.sleep(1.5)
-                st.session_state.limpar += 1
-                st.rerun()
-
-# ==========================================
-# PÁGINA 2: COORDENAÇÃO
-# ==========================================
-else:
-    st.title("📋 Área da Coordenação")
-    senha = st.text_input("Senha de Acesso:", type="password")
-    
-    if senha == "constantino2026":
-        st.success("Acesso Autorizado")
-        
-        # Lê a planilha apenas após o login correto
-        df_base = conn.read(worksheet="Página1", ttl=0).fillna("")
-        
-        if not df_base.empty:
-            c1, c2 = st.columns(2)
-            
-            # Filtros dinâmicos (quem for clicado primeiro, aparece primeiro no PDF)
-            f_d = c1.multiselect("Filtrar Disciplina (A ordem do clique define o PDF):", df_base["Disciplina"].unique())
-            f_t = c2.multiselect("Filtrar Turma (A ordem do clique define o PDF):", df_base["Turma"].unique())
-            
-            dff = df_base.copy()
-            if f_d: dff = dff[dff["Disciplina"].isin(f_d)]
-            if f_t: dff = dff[dff["Turma"].isin(f_t)]
-
-            # Aplica a inteligência de ordenação baseada nos filtros
-            if f_t:
-                dff['Turma'] = pd.Categorical(dff['Turma'], categories=f_t, ordered=True)
-            if f_d:
-                dff['Disciplina'] = pd.Categorical(dff['Disciplina'], categories=f_d, ordered=True)
-
-            if not dff.empty:
-                dff = dff.sort_values(by=['Turma', 'Disciplina'])
-            
-            st.write(f"Total de questões encontradas: {len(dff)}")
-            st.dataframe(dff, use_container_width=True)
-            
-            st.markdown("### 📥 Exportar Questões")
-            col_pdf, col_word, col_excel = st.columns(3)
-            with col_pdf:
-                st.download_button(label="📄 Baixar PDF", data
+                st.session_state.limpar
