@@ -9,12 +9,15 @@ from fpdf import FPDF
 from docx import Document
 from docx.shared import Inches
 
-# 1. CONFIGURAÇÃO DA PÁGINA
+# 1. CONFIGURAÇÃO DA PÁGINA (Deve ser o primeiro comando Streamlit)
 st.set_page_config(
     page_title="Portal Simulado - Constantino", 
     layout="wide", 
     initial_sidebar_state="collapsed"
 )
+
+# 2. CONEXÃO COM A PLANILHA (Definido logo no início para evitar NameError)
+conn = st.connection("gsheets", type=GSheetsConnection)
 
 # --- CONFIGURAÇÕES GITHUB ---
 GITHUB_USER = "arloncb" 
@@ -25,9 +28,6 @@ try:
 except:
     st.error("❌ Erro: Chave 'github_token' não encontrada nos Secrets.")
     st.stop()
-
-# --- CONEXÃO PLANILHA (Definido antes de qualquer uso!) ---
-conn = st.connection("gsheets", type=GSheetsConnection)
 
 # --- FUNÇÃO UPLOAD GITHUB ---
 def upload_to_github(file, filename):
@@ -128,7 +128,7 @@ if pagina == "📝 Enviar Questão":
     st.title("📝 SIMULADO - Lançamento de Questões")
     st.subheader("Escola Pe. Constantino")
 
-    with st.form("form_professor_v11"):
+    with st.form("form_professor_v12"):
         st.markdown("<h4 style='color:black;'>📋 Identificação</h4>", unsafe_allow_html=True)
         c1, c2 = st.columns(2)
         with c1:
@@ -176,38 +176,10 @@ else:
     senha = st.text_input("Senha de Acesso:", type="password")
     if senha == "constantino2026":
         st.success("Acesso Autorizado")
-        df = conn.read(worksheet="Página1", ttl=0).fillna("")
-        if not df.empty:
+        # LEITURA DA PLANILHA (Apenas aqui dentro para segurança)
+        df_base = conn.read(worksheet="Página1", ttl=0).fillna("")
+        
+        if not df_base.empty:
             c1, c2 = st.columns(2)
             
-            # O multiselect preserva a ordem do clique!
-            f_d = c1.multiselect("Filtrar Disciplina (A ordem do clique define a ordem no PDF):", df["Disciplina"].unique())
-            f_t = c2.multiselect("Filtrar Turma (A ordem do clique define a ordem no PDF):", df["Turma"].unique())
-            
-            dff = df.copy()
-            if f_d: dff = dff[dff["Disciplina"].isin(f_d)]
-            if f_t: dff = dff[dff["Turma"].isin(f_t)]
-
-            # --- LÓGICA DE ORDENAÇÃO POR SELEÇÃO ---
-            if f_t:
-                dff['Turma'] = pd.Categorical(dff['Turma'], categories=f_t, ordered=True)
-            if f_d:
-                dff['Disciplina'] = pd.Categorical(dff['Disciplina'], categories=f_d, ordered=True)
-
-            # Aplica a ordenação baseada no que foi selecionado acima
-            dff = dff.sort_values(by=['Turma', 'Disciplina'])
-            
-            st.dataframe(dff, use_container_width=True)
-            
-            st.markdown("### 📥 Exportar Questões Filtradas")
-            col_pdf, col_word, col_excel = st.columns(3)
-            with col_pdf:
-                st.download_button(label="📄 Baixar PDF", data=gerar_pdf_bytes(dff), file_name="simulado_constantino.pdf", mime="application/pdf")
-            with col_word:
-                st.download_button(label="📘 Baixar Word (DOCX)", data=gerar_docx_bytes(dff), file_name="simulado_constantino.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-            with col_excel:
-                st.download_button(label="📊 Baixar Excel (CSV)", data=dff.to_csv(index=False).encode('utf-8'), file_name="simulado.csv", mime="text/csv")
-        else: st.info("Banco vazio.")
-    elif senha != "": st.error("Senha incorreta!")
-
-st.markdown('<div class="rodape-final">Feito com carinho pela Equipe Pe. Constantino ❤️</div>', unsafe_allow_html=True)
+            # ORDENAÇÃO PELO CLIQUE: O
