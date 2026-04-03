@@ -3,7 +3,10 @@ import pandas as pd
 from streamlit_gsheets import GSheetsConnection
 import requests
 import base64
+import io
 from fpdf import FPDF
+from docx import Document
+from docx.shared import Pt
 
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(
@@ -68,11 +71,42 @@ def gerar_pdf_bytes(df_limpo):
         pdf.ln(8)
     return bytes(pdf.output())
 
+# --- FUNÇÃO GERADORA DE WORD (.DOCX) ---
+def gerar_docx_bytes(df_limpo):
+    doc = Document()
+    
+    # Título do Word
+    doc.add_heading('Simulado - Escola Pe. Constantino', 0)
+
+    for i, row in df_limpo.reset_index(drop=True).iterrows():
+        # Cabeçalho da Questão (Título Nível 2)
+        doc.add_heading(f"QUESTÃO {i+1} | {row['Disciplina']} - {row['Turma']}", level=2)
+        
+        # Habilidade (Itálico)
+        p_hab = doc.add_paragraph()
+        run_hab = p_hab.add_run(f"Código da Habilidade (Referencial Curricular de MS): {row['Habilidade']}")
+        run_hab.italic = True
+        
+        # Enunciado
+        doc.add_paragraph(row['Pergunta'])
+        
+        # Alternativas
+        for letra in ['A', 'B', 'C', 'D', 'E']:
+            doc.add_paragraph(f"{letra.lower()}) {row[letra]}")
+        
+        # Separador entre questões
+        doc.add_paragraph("-" * 40)
+
+    # Salva o arquivo em memória (Bytes)
+    bio = io.BytesIO()
+    doc.save(bio)
+    return bio.getvalue()
+
 # --- DESIGN PREMIUM ---
 st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] { background: linear-gradient(135deg, #1e1b4b 0%, #3b82f6 100%) fixed; }
-    .stForm { background: rgba(255, 255, 255, 0.98) !important; padding: 40px !important; border-radius: 25px !important; box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
+    .stForm { background: rgba(255, 255, 255, 0.98) !important; padding: 40px !important; border-radius: 25px !important; }
     h1, h2, h3, .stSubheader { color: white !important; font-weight: 800 !important; text-align: center; }
     .stTextInput label, .stSelectbox label, .stTextArea label { color: black !important; font-weight: bold !important; font-size: 16px !important; }
     div.stButton > button:first-child { width: 100%; background: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%); color: white !important; padding: 15px; border-radius: 12px; font-weight: bold; border: none; }
@@ -93,7 +127,7 @@ if pagina == "📝 Enviar Questão":
     st.title("📝 SIMULADO - Lançamento de Questões")
     st.subheader("Escola Pe. Constantino")
 
-    with st.form("form_professor_final"):
+    with st.form("form_professor_v6"):
         st.markdown("<h4 style='color:black;'>📋 Identificação</h4>", unsafe_allow_html=True)
         c1, c2 = st.columns(2)
         with c1:
@@ -148,21 +182,25 @@ else:
             if f_d: dff = dff[dff["Disciplina"].isin(f_d)]
             if f_t: dff = dff[dff["Turma"].isin(f_t)]
             
-            # --- O PULO DO GATO: Ordenação para o PDF ---
-            # Ordena por Turma e depois por Disciplina para que o PDF saia organizado
+            # Ordenação automática
             dff = dff.sort_values(by=['Turma', 'Disciplina'])
             
             st.dataframe(dff, use_container_width=True)
             
-            st.markdown("### 📥 Exportar")
-            col_pdf, col_csv = st.columns(2)
+            st.markdown("### 📥 Exportar Questões Filtradas")
+            # Agora temos 3 colunas para os 3 formatos
+            col_pdf, col_word, col_excel = st.columns(3)
+            
             with col_pdf:
-                # O PDF agora levará as questões filtradas e ORDENADAS
-                st.download_button(label="📄 Baixar Simulado Filtrado (PDF)", data=gerar_pdf_bytes(dff), file_name="simulado_constantino.pdf", mime="application/pdf")
-            with col_csv:
+                st.download_button(label="📄 Baixar PDF", data=gerar_pdf_bytes(dff), file_name="simulado_constantino.pdf", mime="application/pdf")
+            
+            with col_word:
+                st.download_button(label="📘 Baixar Word (DOCX)", data=gerar_docx_bytes(dff), file_name="simulado_constantino.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                
+            with col_excel:
                 st.download_button(label="📊 Baixar Excel (CSV)", data=dff.to_csv(index=False).encode('utf-8'), file_name="simulado.csv", mime="text/csv")
         else:
-            st.info("O banco de dados ainda está vazio.")
+            st.info("Banco vazio.")
     elif senha != "":
         st.error("Senha incorreta!")
 
