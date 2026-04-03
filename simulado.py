@@ -72,95 +72,9 @@ def gerar_pdf_bytes(df_limpo):
 st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] { background: linear-gradient(135deg, #1e1b4b 0%, #3b82f6 100%) fixed; }
-    .stForm { background: rgba(255, 255, 255, 0.98) !important; padding: 40px !important; border-radius: 25px !important; }
+    .stForm { background: rgba(255, 255, 255, 0.98) !important; padding: 40px !important; border-radius: 25px !important; box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
     h1, h2, h3, .stSubheader { color: white !important; font-weight: 800 !important; text-align: center; }
     .stTextInput label, .stSelectbox label, .stTextArea label { color: black !important; font-weight: bold !important; font-size: 16px !important; }
     div.stButton > button:first-child { width: 100%; background: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%); color: white !important; padding: 15px; border-radius: 12px; font-weight: bold; border: none; }
     .instrucao-foto { color: #1e1b4b; font-weight: bold; margin-bottom: -15px; font-size: 16px; }
-    .rodape-constantino { text-align: center; color: white; font-weight: bold; padding: 25px; font-size: 18px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- ESTADO DE SESSÃO ---
-if 'limpar' not in st.session_state: st.session_state.limpar = 0
-
-# --- MENU ---
-st.sidebar.title("Navegação")
-pagina = st.sidebar.radio("Ir para:", ["📝 Enviar Questão", "📋 Área da Coordenação"])
-
-# ==========================================
-# PÁGINA 1: ENVIO
-# ==========================================
-if pagina == "📝 Enviar Questão":
-    st.title("📝 Portal do Professor")
-    st.subheader("Escola Pe. Constantino")
-
-    # Início do Formulário
-    with st.form("form_professor_ms"):
-        st.markdown("<h4 style='color:black;'>📋 Identificação</h4>", unsafe_allow_html=True)
-        c1, c2 = st.columns(2)
-        with c1:
-            prof = st.text_input("Seu Nome:", key="p_fixo")
-            disc = st.selectbox("Sua Disciplina:", ["Selecione...", "Matemática", "Português", "História", "Geografia", "Ciências", "Biologia", "Química", "Física", "Sociologia", "Filosofia", "Inglês", "Artes", "Ed. Física"], key="d_fixo")
-        with c2:
-            turma = st.text_input("Série/Turma:", key="t_fixo")
-            hab = st.text_input("Código da Habilidade (Referencial Curricular de MS):", key=f"h_{st.session_state.limpar}")
-
-        st.markdown("---")
-        pergunta = st.text_area("Enunciado da Questão:", height=150, key=f"q_{st.session_state.limpar}")
-        
-        st.markdown('<p class="instrucao-foto">Adicione uma imagem em sua questão aqui:</p>', unsafe_allow_html=True)
-        foto = st.file_uploader("", type=["png", "jpg", "jpeg"], key=f"f_{st.session_state.limpar}")
-        
-        st.markdown("---")
-        st.markdown("<h4 style='color:black;'>🔘 Alternativas</h4>", unsafe_allow_html=True)
-        a = st.text_input("A:", key=f"a_{st.session_state.limpar}")
-        b = st.text_input("B:", key=f"b_{st.session_state.limpar}")
-        c = st.text_input("C:", key=f"c_{st.session_state.limpar}")
-        d = st.text_input("D:", key=f"d_{st.session_state.limpar}")
-        e = st.text_input("E:", key=f"e_{st.session_state.limpar}")
-        gab = st.selectbox("Gabarito:", ["A", "B", "C", "D", "E"], key=f"g_{st.session_state.limpar}")
-
-        # BOTÃO OBRIGATÓRIO DENTRO DO FORMULÁRIO
-        botao_enviar = st.form_submit_button("💾 SALVAR E CONTINUAR")
-
-        if botao_enviar:
-            if not prof or disc == "Selecione..." or not pergunta:
-                st.error("🚨 Preencha os campos obrigatórios!")
-            else:
-                img_url = upload_to_github(foto, f"{disc}_{pd.Timestamp.now().strftime('%H%M%S')}.jpg") if foto else ""
-                df_old = conn.read(worksheet="Página1", ttl=0)
-                nova = pd.DataFrame([{
-                    "Data": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"), 
-                    "Professor (a)": prof, 
-                    "Disciplina": disc, 
-                    "Turma": turma, 
-                    "Habilidade": hab, 
-                    "Pergunta": pergunta, 
-                    "A": a, "B": b, "C": c, "D": d, "E": e, 
-                    "Correta": gab, 
-                    "Link Imagem": img_url
-                }])
-                conn.update(worksheet="Página1", data=pd.concat([df_old, nova], ignore_index=True))
-                st.session_state.limpar += 1
-                st.success("✅ Salvo com sucesso!")
-                st.rerun()
-
-# ==========================================
-# PÁGINA 2: COORDENAÇÃO
-# ==========================================
-else:
-    st.title("📋 Área Pedagógica")
-    senha = st.text_input("Senha de Acesso:", type="password")
-    
-    if senha == "constantino2026":
-        st.success("Acesso Autorizado")
-        df = conn.read(worksheet="Página1", ttl=0).fillna("")
-        if not df.empty:
-            c1, c2 = st.columns(2)
-            f_d = c1.multiselect("Filtrar Disciplina:", df["Disciplina"].unique())
-            f_t = c2.multiselect("Filtrar Turma:", df["Turma"].unique())
-            
-            dff = df.copy()
-            if f_d: dff = dff[dff["Disciplina"].isin(f_d)]
-            if f_t: dff = dff[dff["Turma"].isin(f_t)]
+    .rodape-final { text-align: center
