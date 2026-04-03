@@ -41,52 +41,44 @@ def upload_to_github(file, filename):
         return f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/main/{path}" if res.status_code in [200, 201] else ""
     except: return ""
 
-# --- FUNÇÃO GERADORA DE PDF (AGORA COM IMAGEM) ---
+# --- FUNÇÃO GERADORA DE PDF ---
 def gerar_pdf_bytes(df_limpo):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
     pdf.set_left_margin(15)
     largura_util = 180
-
     def escrever_texto(t, estilo="", tam=11):
         pdf.set_font("Helvetica", estilo, tam)
         pdf.set_x(15)
         pdf.multi_cell(largura_util, 7, str(t).encode('latin-1', 'replace').decode('latin-1'), align='L')
-
     pdf.set_font("Helvetica", "B", 16)
     pdf.cell(largura_util, 10, "Simulado - Escola Pe. Constantino", ln=True, align="C")
     pdf.ln(10)
-
     for i, row in df_limpo.reset_index(drop=True).iterrows():
         escrever_texto(f"QUESTÃO {i+1} | {row['Disciplina']} - {row['Turma']}", "B", 12)
         escrever_texto(f"Código da Habilidade (Referencial Curricular de MS): {row['Habilidade']}", "I", 10)
         pdf.ln(2)
         escrever_texto(row['Pergunta'], "", 11)
         pdf.ln(2)
-
-        # LÓGICA DE IMAGEM NO PDF
         link_img = row.get('Link Imagem', '')
         if link_img and str(link_img).startswith("http"):
             try:
                 response = requests.get(link_img)
                 if response.status_code == 200:
                     img_data = io.BytesIO(response.content)
-                    pdf.image(img_data, x=15, w=100) # Insere a imagem com 10cm de largura
+                    pdf.image(img_data, x=15, w=100)
                     pdf.ln(5)
-            except:
-                escrever_texto("[Imagem não carregada no PDF]", "I", 8)
-
+            except: pass
         for letra in ['A', 'B', 'C', 'D', 'E']:
             escrever_texto(f"{letra.lower()}) {row[letra]}", "", 11)
-        
         pdf.ln(10)
         pdf.set_x(15)
         pdf.line(15, pdf.get_y(), 195, pdf.get_y())
         pdf.ln(8)
     return bytes(pdf.output())
 
-# --- FUNÇÃO GERADORA DE WORD (AGORA COM IMAGEM) ---
+# --- FUNÇÃO GERADORA DE WORD ---
 def gerar_docx_bytes(df_limpo):
     doc = Document()
     doc.add_heading('Simulado - Escola Pe. Constantino', 0)
@@ -96,22 +88,17 @@ def gerar_docx_bytes(df_limpo):
         run_hab = p_hab.add_run(f"Código da Habilidade (Referencial Curricular de MS): {row['Habilidade']}")
         run_hab.italic = True
         doc.add_paragraph(row['Pergunta'])
-
-        # LÓGICA DE IMAGEM NO WORD
         link_img = row.get('Link Imagem', '')
         if link_img and str(link_img).startswith("http"):
             try:
                 response = requests.get(link_img)
                 if response.status_code == 200:
                     img_data = io.BytesIO(response.content)
-                    doc.add_picture(img_data, width=Inches(4)) # Insere a imagem no Word
-            except:
-                doc.add_paragraph("[Imagem não disponível]")
-
+                    doc.add_picture(img_data, width=Inches(4))
+            except: pass
         for letra in ['A', 'B', 'C', 'D', 'E']:
             doc.add_paragraph(f"{letra.lower()}) {row[letra]}")
         doc.add_paragraph("-" * 40)
-    
     bio = io.BytesIO()
     doc.save(bio)
     return bio.getvalue()
@@ -134,22 +121,30 @@ if 'limpar' not in st.session_state: st.session_state.limpar = 0
 st.sidebar.title("Navegação")
 pagina = st.sidebar.radio("Ir para:", ["📝 Enviar Questão", "📋 Área da Coordenação"])
 
+# ==========================================
+# PÁGINA 1: ENVIO
+# ==========================================
 if pagina == "📝 Enviar Questão":
     st.title("📝 SIMULADO - Lançamento de Questões")
     st.subheader("Escola Pe. Constantino")
-    with st.form("form_v8"):
+
+    with st.form("form_professor_v9"):
         st.markdown("<h4 style='color:black;'>📋 Identificação</h4>", unsafe_allow_html=True)
         c1, c2 = st.columns(2)
         with c1:
             prof = st.text_input("Seu Nome:", key="p_fixo")
             disc = st.selectbox("Sua Disciplina:", ["Selecione...", "Matemática", "Português", "História", "Geografia", "Ciências", "Biologia", "Química", "Física", "Sociologia", "Filosofia", "Inglês", "Artes", "Ed. Física"], key="d_fixo")
         with c2:
-            turma = st.text_input("Série/Turma:", key="t_fixo")
+            # --- MUDANÇA AQUI: MENU CASCATA PARA TURMAS ---
+            opcoes_turma = ["Selecione...", "4° ano", "5° ano", "6° ano", "7° ano", "8° ano", "9° ano", "1° ano EM", "2° ano EM", "3° ano"]
+            turma = st.selectbox("Série/Turma:", opcoes_turma, key="t_fixo")
             hab = st.text_input("Código da Habilidade (Referencial Curricular de MS):", key=f"h_{st.session_state.limpar}")
+
         st.markdown("---")
         pergunta = st.text_area("Enunciado da Questão:", height=150, key=f"q_{st.session_state.limpar}")
         st.markdown('<p class="instrucao-foto">Adicione uma imagem em sua questão aqui:</p>', unsafe_allow_html=True)
         foto = st.file_uploader("", type=["png", "jpg", "jpeg"], key=f"f_{st.session_state.limpar}")
+        
         st.markdown("---")
         st.markdown("<h4 style='color:black;'>🔘 Alternativas</h4>", unsafe_allow_html=True)
         a = st.text_input("A:", key=f"a_{st.session_state.limpar}")
@@ -158,9 +153,10 @@ if pagina == "📝 Enviar Questão":
         d = st.text_input("D:", key=f"d_{st.session_state.limpar}")
         e = st.text_input("E:", key=f"e_{st.session_state.limpar}")
         gab = st.selectbox("Gabarito:", ["A", "B", "C", "D", "E"], key=f"g_{st.session_state.limpar}")
+
         if st.form_submit_button("💾 SALVAR E CONTINUAR"):
-            if not prof or disc == "Selecione..." or not pergunta:
-                st.error("🚨 Preencha os campos obrigatórios!")
+            if not prof or disc == "Selecione..." or turma == "Selecione..." or not pergunta:
+                st.error("🚨 Preencha os campos obrigatórios (Nome, Disciplina, Turma e Enunciado)!")
             else:
                 with st.status("🚀 Processando lançamento...", expanded=True) as status:
                     img_url = upload_to_github(foto, f"{disc}_{pd.Timestamp.now().strftime('%H%M%S')}.jpg") if foto else ""
@@ -172,6 +168,10 @@ if pagina == "📝 Enviar Questão":
                 time.sleep(1.5)
                 st.session_state.limpar += 1
                 st.rerun()
+
+# ==========================================
+# PÁGINA 2: COORDENAÇÃO
+# ==========================================
 else:
     st.title("📋 Área da Coordenação")
     senha = st.text_input("Senha de Acesso:", type="password")
