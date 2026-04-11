@@ -33,32 +33,146 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- 2. FUNÇÕES DE CONEXÃO ---
-
 def conectar_google_sheets():
     try:
         scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
         info_gs = st.secrets["connections"]["gsheets"]
         creds = Credentials.from_service_account_info(info_gs, scopes=scope)
         client = gspread.authorize(creds)
-        return client.open_by_url(info_gs["spreadsheet"]).get_worksheet(0)
+        url_planilha = info_gs["spreadsheet"]
+        return client.open_by_url(url_planilha).get_worksheet(0)
     except Exception as e:
         st.error(f"Erro de Conexão: {e}")
         return None
 
-# --- 3. FUNÇÃO DO WORD (COM SEPARAÇÃO DE LINHA) ---
+# --- 3. FUNÇÃO DO WORD (PEDAGÓGICA E ANTI-QUEBRA) ---
 def gerar_word(df, titulo_doc):
     doc = Document()
-    doc.add_heading(f'Simulado - {titulo_doc}', 0)
-    doc.add_paragraph(f'Escola Pe. Constantino de Monte - Gerado em: {datetime.now().strftime("%d/%m/%Y")}')
     
-    # Padroniza os nomes das colunas
+    # Textos fatiados para não quebrar a linha no copia e cola
+    texto_titulo = f'Simulado - {titulo_doc}'
+    data_hoje = datetime.now().strftime("%d/%m/%Y")
+    texto_cabecalho = f'Escola Pe. Constantino de Monte - Gerado em: {data_hoje}'
+    
+    doc.add_heading(texto_titulo, 0)
+    doc.add_paragraph(texto_cabecalho)
+    
+    # Padroniza as colunas
     df.columns = [str(c).strip().lower() for c in df.columns]
 
     for i, row in df.iterrows():
         # Disciplina
         disc = str(row.get('disciplina', '-')).upper()
-        doc.add_heading(f'Questão {i+1} - {disc}', level=2)
+        texto_questao = f'Questão {i+1} - {disc}'
+        doc.add_heading(texto_questao, level=2)
         
         # Habilidade
         hab = str(row.get('habilidade', 'Não informada'))
-        doc.add_paragraph(f'
+        texto_hab = f'Habilidade: {hab}'
+        doc.add_paragraph(texto_hab)
+        doc.add_paragraph("") # Pula a linha
+        
+        # Enunciado
+        enunciado_txt = row.get('enunciado', row.get('pergunta', 'Sem texto'))
+        doc.add_paragraph(str(enunciado_txt))
+        
+        # Alternativas Empilhadas
+        alt_a = f"A) {row.get('a', '')}"
+        alt_b = f"B) {row.get('b', '')}"
+        alt_c = f"C) {row.get('c', '')}"
+        alt_d = f"D) {row.get('d', '')}"
+        alt_e = f"E) {row.get('e', '')}"
+        
+        doc.add_paragraph(alt_a)
+        doc.add_paragraph(alt_b)
+        doc.add_paragraph(alt_c)
+        doc.add_paragraph(alt_d)
+        doc.add_paragraph(alt_e)
+        
+        # Espaçador entre questões
+        doc.add_paragraph("-" * 40)
+
+    buffer = BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+# --- 4. ÁREA RESTRITA ---
+st.sidebar.header("🔐 Coordenação")
+senha = st.sidebar.text_input("Senha", type="password")
+acesso_coord = (senha == "constantino2026")
+
+if acesso_coord:
+    st.sidebar.success("Acesso Liberado!")
+    menu = st.sidebar.radio("Navegação", ["Lançar Questões", "Ver Banco de Questões"])
+else:
+    menu = "Lançar Questões"
+
+# --- 5. TELA: LANÇAR ---
+if menu == "Lançar Questões":
+    st.title("📝 Lançador de Simulados")
+    with st.form("form_lançar"):
+        prof = st.text_input("Nome do Professor")
+        col_form1, col_form2 = st.columns(2)
+        
+        with col_form1:
+            lista_disc = ["Português", "Matemática", "História", "Geografia", "Ciências", "Inglês", "Artes", "Ed. Física"]
+            disc = st.selectbox("Disciplina", lista_disc)
+        with col_form2:
+            hab_input = st.text_input("Habilidade (Ex: EF06MA01)")
+            
+        lista_turmas = ["6º A", "6º B", "7º A", "7º B", "8º A", "8º B", "9º A", "9º B"]
+        turmas = st.multiselect("Para quais turmas?", lista_turmas)
+        
+        enunciado = st.text_area("Enunciado da Questão")
+        
+        c1, c2 = st.columns(2)
+        with c1: 
+            a = st.text_input("Alternativa A")
+            b = st.text_input("Alternativa B")
+            c = st.text_input("Alternativa C")
+        with c2: 
+            d = st.text_input("Alternativa D")
+            e = st.text_input("Alternativa E")
+            gab = st.selectbox("Gabarito (Fica na Planilha)", ["A", "B", "C", "D", "E"])
+        
+        btn_enviar = st.form_submit_button("🚀 SALVAR QUESTÃO NO BANCO")
+
+    if btn_enviar:
+        if not prof or not turmas or not enunciado:
+            st.warning("⚠️ Preencha Nome, Turmas e Enunciado!")
+        else:
+            with st.spinner("Salvando..."):
+                sheet = conectar_google_sheets()
+                if sheet:
+                    try:
+                        data_hora = datetime.now().strftime("%d/%m/%Y %H:%M")
+                        for t in turmas:
+                            linha = [data_hora, prof, disc, hab_input, t, enunciado, "", a, b, c, d, e, gab]
+                            sheet.append_row(linha)
+                        
+                        texto_sucesso = f"✅ Salvo com sucesso para: {', '.join(turmas)}"
+                        st.success(texto_sucesso)
+                        st.balloons()
+                    except Exception as err:
+                        st.error(f"Erro ao salvar: {err}")
+
+# --- 6. TELA: VER BANCO (COORDENAÇÃO) ---
+elif menu == "Ver Banco de Questões":
+    st.title("📊 Gestão de Questões")
+    
+    with st.spinner("Lendo banco de dados..."):
+        sheet = conectar_google_sheets()
+        
+    if sheet:
+        try:
+            dados = sheet.get_all_records()
+            if not dados:
+                st.info("Nenhuma questão encontrada.")
+            else:
+                df = pd.DataFrame(dados)
+                
+                st.write("🔍 **Filtros para o Documento**")
+                col_f1, col_f2 = st.columns(2)
+                with col_f1: 
+                    f_t = st
