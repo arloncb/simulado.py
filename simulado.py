@@ -11,30 +11,33 @@ from io import BytesIO
 # --- CONFIGURAÇÕES INICIAIS ---
 st.set_page_config(page_title="Portal Escola Constantino", layout="centered")
 
-# --- 1. VISUAL LIMPO E FORTE (CSS) ---
+# --- 1. VISUAL À PROVA DE ERROS (CSS FORÇADO) ---
 st.markdown("""
     <style>
-    /* Forçando o fundo branco e texto escuro para não sumir no Dark Mode */
-    .stApp { background-color: #FFFFFF !important; }
-    h1, h2, h3, p, label, span, div { color: #111111 !important; }
-    
-    /* Blocos de conteúdo (Cards) */
+    /* Força fundo branco e texto preto em qualquer modo (claro/escuro) */
+    html, body, [data-testid="stAppViewContainer"] {
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+    }
+    h1, h2, h3, h4, h5, h6, p, label, span, li, div {
+        color: #000000 !important;
+    }
+    /* Estilo dos blocos (Cards) */
     div[data-testid="stVerticalBlock"] > div {
-        background-color: #F8F9FA !important;
+        background-color: #F0F2F6 !important;
         padding: 20px !important;
-        border-radius: 12px !important;
-        border: 1px solid #E2E8F0 !important;
+        border-radius: 10px !important;
+        border: 1px solid #D1D5DB !important;
         margin-bottom: 10px !important;
     }
-
-    /* Botão de Envio Verde */
+    /* Botão Verde */
     .stButton>button {
         width: 100%;
         background-color: #16A34A !important;
-        color: white !important;
+        color: #FFFFFF !important;
         font-weight: bold !important;
-        height: 3.5em !important;
         border-radius: 8px !important;
+        height: 3.5em !important;
         border: none !important;
     }
     </style>
@@ -45,18 +48,20 @@ st.markdown("""
 def conectar_google_sheets():
     try:
         scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+        # Acessa exatamente o caminho que você tem nos seus Secrets
         info_gs = st.secrets["connections"]["gsheets"]
         creds = Credentials.from_service_account_info(info_gs, scopes=scope)
         client = gspread.authorize(creds)
+        # Pega a URL da planilha que está dentro do bloco gsheets
         return client.open_by_url(info_gs["spreadsheet"]).get_worksheet(0)
     except Exception as e:
-        st.error(f"Erro na conexão Google: {e}")
+        st.error(f"Erro de Conexão: {e}")
         return None
 
 def upload_github(arquivo, nome_arquivo):
     try:
         token = st.secrets["github_token"]
-        # ⚠️ LEMBRE-SE DE AJUSTAR PARA SEU_USUARIO/SEU_REPOSITORIO
+        # ⚠️ AJUSTE SEU REPOSITÓRIO AQUI:
         repo = "SEU_USUARIO/SEU_REPOSITORIO" 
         url = f"https://api.github.com/repos/{repo}/contents/imagens/{nome_arquivo}"
         conteudo = base64.b64encode(arquivo.read()).decode()
@@ -67,6 +72,4 @@ def upload_github(arquivo, nome_arquivo):
     except:
         return ""
 
-def gerar_word(df, titulo_doc):
-    doc = Document()
-    doc.add_heading(f'
+def gerar_word
