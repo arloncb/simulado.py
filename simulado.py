@@ -83,7 +83,6 @@ def gerar_word(df, titulo_doc):
     doc.add_heading(txt_tit, 0)
     doc.add_paragraph(txt_cab)
     
-    # Limpa colunas
     df.columns = [str(c).strip().lower() for c in df.columns]
 
     for i, row in df.iterrows():
@@ -94,13 +93,11 @@ def gerar_word(df, titulo_doc):
         hab = str(row.get('habilidade', 'Não informada'))
         doc.add_paragraph(f'Habilidade: {hab}')
         
-        # Pula linha entre habilidade e enunciado
         doc.add_paragraph("") 
         
         enunc = row.get('enunciado', row.get('pergunta', 'Sem texto'))
         doc.add_paragraph(str(enunc))
         
-        # Insere a Imagem se houver
         url_foto = str(row.get('foto', row.get('imagem', ''))).strip()
         if url_foto.startswith('http'):
             try:
@@ -111,7 +108,6 @@ def gerar_word(df, titulo_doc):
             except:
                 doc.add_paragraph("[Erro ao carregar a imagem da questão]")
         
-        # Alternativas
         doc.add_paragraph(f"A) {row.get('a', '')}")
         doc.add_paragraph(f"B) {row.get('b', '')}")
         doc.add_paragraph(f"C) {row.get('c', '')}")
@@ -136,31 +132,4 @@ if acesso_coord:
 else:
     menu = "Lançar"
 
-# --- TELA: LANÇAR ---
-if menu == "Lançar":
-    st.title("📝 Lançador de Simulados")
-    with st.form("form_lancar"):
-        prof = st.text_input("Nome do Professor")
-        c_f1, c_f2 = st.columns(2)
-        
-        l_disc = [
-            "Português", "Matemática", "História", "Geografia", 
-            "Ciências", "Inglês", "Artes", "Ed. Física"
-        ]
-        
-        with c_f1:
-            disc = st.selectbox("Disciplina", l_disc)
-        with c_f2:
-            hab_in = st.text_input("Habilidade (Ex: EF06MA01)")
-            
-        l_turmas = ["6º A", "6º B", "7º A", "7º B", "8º A", "8º B", "9º A", "9º B"]
-        turmas = st.multiselect("Para quais turmas?", l_turmas)
-        
-        enunc = st.text_area("Enunciado da Questão")
-        
-        foto = st.file_uploader("Imagem (Máx 10MB)", type=["jpg", "png", "jpeg"])
-        
-        c1, c2 = st.columns(2)
-        with c1: 
-            a = st.text_input("Alternativa A")
-            b = st.text_
+# --- T
