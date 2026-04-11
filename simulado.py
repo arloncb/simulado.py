@@ -4,6 +4,7 @@ from google.oauth2.service_account import Credentials
 import requests
 import base64
 from datetime import datetime
+import pandas as pd
 
 # --- CONFIGURAÇÕES DA PÁGINA ---
 st.set_page_config(page_title="Portal Simulado - Escola Constantino", layout="centered")
@@ -13,6 +14,8 @@ st.markdown("""
     <style>
     .stApp { background-color: #f4f7f9 !important; }
     h1, h2, h3 { color: #0f172a !important; font-family: 'Segoe UI', sans-serif; }
+    
+    /* Cards brancos com sombra */
     div[data-testid="stVerticalBlock"] > div {
         background-color: #ffffff !important;
         padding: 25px !important;
@@ -21,17 +24,23 @@ st.markdown("""
         margin-bottom: 15px !important;
         border: 1px solid #e2e8f0 !important;
     }
+
+    /* Forçando contraste das fontes */
     label p, .stMarkdown p, p {
         color: #1e293b !important;
         font-size: 19px !important;
         font-weight: 600 !important;
     }
+
+    /* Inputs visíveis */
     input, textarea, div[data-baseweb="select"] > div {
         background-color: #ffffff !important;
         color: #000000 !important;
         border: 2px solid #cbd5e1 !important;
         border-radius: 8px !important;
     }
+
+    /* Botão de Enviar */
     .stButton>button {
         width: 100%;
         background-color: #059669 !important;
@@ -45,20 +54,18 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. FUNÇÕES DE CONEXÃO CORRIGIDAS ---
+# --- 2. FUNÇÕES DE CONEXÃO ---
 
 def conectar_google_sheets():
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    # Acessando o caminho correto nos seus Secrets
     info_gs = st.secrets["connections"]["gsheets"]
     creds = Credentials.from_service_account_info(info_gs, scopes=scope)
     client = gspread.authorize(creds)
-    # Busca a URL que está dentro do bloco gsheets
     return client.open_by_url(info_gs["spreadsheet"]).get_worksheet(0)
 
 def upload_github(arquivo, nome_arquivo):
     token = st.secrets["github_token"]
-    # ⚠️ AJUSTE AQUI SEU USUARIO/REPOSITORIO
+    # ⚠️ AJUSTE: Mude para seu usuario/repositorio
     repo = "SEU_USUARIO/SEU_REPOSITORIO" 
     url = f"https://api.github.com/repos/{repo}/contents/imagens/{nome_arquivo}"
     conteudo = base64.b64encode(arquivo.read()).decode()
@@ -67,46 +74,53 @@ def upload_github(arquivo, nome_arquivo):
     res = requests.put(url, json=payload, headers=headers)
     return res.json()['content']['download_url'] if res.status_code in [200, 201] else ""
 
-# --- 3. INTERFACE ---
+# --- 3. BARRA LATERAL (ACESSO COORDENAÇÃO) ---
+st.sidebar.title("🔐 Acesso Restrito")
+senha = st.sidebar.text_input("Senha da Coordenação", type="password")
+acesso_coord = (senha == "constantino2026")
 
-st.title("📝 Portal de Simulados")
-st.write("Escola Padre Constantino de Monte")
+if acesso_coord:
+    st.sidebar.success("Acesso Liberado!")
+    menu = st.sidebar.radio("Navegação", ["Lançar Questões", "Ver Banco de Questões"])
+else:
+    if senha: st.sidebar.error("Senha Incorreta")
+    menu = "Lançar Questões"
 
-with st.container():
-    prof = st.text_input("👤 Nome do Professor")
-    disciplina = st.selectbox("📚 Disciplina", ["Português", "Matemática", "História", "Geografia", "Ciências", "Inglês", "Artes", "Ed. Física"])
-    turmas = st.multiselect("🏫 Para quais turmas?", ["6º A", "6º B", "7º A", "7º B", "8º A", "8º B", "9º A", "9º B"])
+# --- 4. INTERFACE: LANÇAR QUESTÕES ---
+if menu == "Lançar Questões":
+    st.title("📝 Portal de Simulados")
+    st.write("Escola Padre Constantino de Monte")
 
-with st.container():
-    enunciado = st.text_area("✍️ Enunciado da Questão")
-    foto = st.file_uploader("🖼️ Imagem (Máx 10MB)", type=["jpg", "jpeg", "png"])
-    if foto and foto.size > 10 * 1024 * 1024:
-        st.error("🚨 Imagem muito grande! Escolha uma de até 10MB.")
-        foto = None
+    with st.container():
+        prof = st.text_input("👤 Nome do Professor")
+        disciplina = st.selectbox("📚 Disciplina", ["Português", "Matemática", "História", "Geografia", "Ciências", "Inglês", "Artes", "Ed. Física"])
+        turmas = st.multiselect("🏫 Para quais turmas?", ["6º A", "6º B", "7º A", "7º B", "8º A", "8º B", "9º A", "9º B"])
 
-with st.container():
-    st.write("🎯 **Alternativas**")
-    c1, c2 = st.columns(2)
-    with c1:
-        a, b, c = st.text_input("A)"), st.text_input("B)"), st.text_input("C)")
-    with c2:
-        d, e = st.text_input("D)"), st.text_input("E)")
-        gabarito = st.selectbox("Gabarito", ["A", "B", "C", "D", "E"])
+    with st.container():
+        enunciado = st.text_area("✍️ Enunciado da Questão")
+        foto = st.file_uploader("🖼️ Imagem (Opcional - Máx 10MB)", type=["jpg", "jpeg", "png"])
+        if foto and foto.size > 10 * 1024 * 1024:
+            st.error("🚨 Imagem muito grande! O limite é 10MB.")
+            foto = None
 
-# --- 4. ENVIO ---
+    with st.container():
+        st.write("🎯 **Alternativas**")
+        c1, c2 = st.columns(2)
+        with c1:
+            a, b, c = st.text_input("A)"), st.text_input("B)"), st.text_input("C)")
+        with c2:
+            d, e = st.text_input("D)"), st.text_input("E)")
+            gabarito = st.selectbox("Gabarito", ["A", "B", "C", "D", "E"])
 
-if st.button("🚀 FINALIZAR E LANÇAR"):
-    if not prof or not turmas or not enunciado:
-        st.warning("⚠️ Preencha os campos obrigatórios!")
-    else:
-        with st.spinner("Gravando dados..."):
-            try:
-                url_img = upload_github(foto, f"{datetime.now().timestamp()}.jpg") if foto else ""
-                sheet = conectar_google_sheets()
-                for t in turmas:
-                    linha = [datetime.now().strftime("%d/%m/%Y %H:%M"), prof, disciplina, t, enunciado, url_img, a, b, c, d, e, gabarito]
-                    sheet.append_row(linha)
-                st.success(f"✅ Enviado para: {', '.join(turmas)}")
-                st.balloons()
-            except Exception as err:
-                st.error(f"❌ Erro: {err}")
+    if st.button("🚀 FINALIZAR E LANÇAR"):
+        if not prof or not turmas or not enunciado:
+            st.warning("⚠️ Preencha os campos obrigatórios!")
+        else:
+            with st.spinner("Gravando dados..."):
+                try:
+                    url_img = upload_github(foto, f"{datetime.now().timestamp()}.jpg") if foto else ""
+                    sheet = conectar_google_sheets()
+                    for t in turmas:
+                        linha = [datetime.now().strftime("%d/%m/%Y %H:%M"), prof, disciplina, t, enunciado, url_img, a, b, c, d, e, gabarito]
+                        sheet.append_row(linha)
+                    st.success(f"✅ Enviado com sucesso!")
