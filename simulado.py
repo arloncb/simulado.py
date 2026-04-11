@@ -15,7 +15,6 @@ st.markdown("""
     .stApp { background-color: #f4f7f9 !important; }
     h1, h2, h3 { color: #0f172a !important; font-family: 'Segoe UI', sans-serif; }
     
-    /* Cards brancos com sombra */
     div[data-testid="stVerticalBlock"] > div {
         background-color: #ffffff !important;
         padding: 25px !important;
@@ -25,14 +24,12 @@ st.markdown("""
         border: 1px solid #e2e8f0 !important;
     }
 
-    /* Forçando contraste das fontes */
     label p, .stMarkdown p, p {
         color: #1e293b !important;
         font-size: 19px !important;
         font-weight: 600 !important;
     }
 
-    /* Inputs visíveis */
     input, textarea, div[data-baseweb="select"] > div {
         background-color: #ffffff !important;
         color: #000000 !important;
@@ -40,7 +37,6 @@ st.markdown("""
         border-radius: 8px !important;
     }
 
-    /* Botão de Enviar */
     .stButton>button {
         width: 100%;
         background-color: #059669 !important;
@@ -61,21 +57,24 @@ def conectar_google_sheets():
     info_gs = st.secrets["connections"]["gsheets"]
     creds = Credentials.from_service_account_info(info_gs, scopes=scope)
     client = gspread.authorize(creds)
+    # Abre a planilha usando o link que está nos segredos
     return client.open_by_url(info_gs["spreadsheet"]).get_worksheet(0)
 
 def upload_github(arquivo, nome_arquivo):
     token = st.secrets["github_token"]
-    # ⚠️ AJUSTE: Mude para seu usuario/repositorio
+    # ⚠️ LEMBRE-SE DE AJUSTAR PARA SEU USUARIO/REPOSITORIO AQUI ABAIXO:
     repo = "SEU_USUARIO/SEU_REPOSITORIO" 
     url = f"https://api.github.com/repos/{repo}/contents/imagens/{nome_arquivo}"
     conteudo = base64.b64encode(arquivo.read()).decode()
     payload = {"message": f"Questão: {nome_arquivo}", "content": conteudo}
     headers = {"Authorization": f"token {token}"}
     res = requests.put(url, json=payload, headers=headers)
-    return res.json()['content']['download_url'] if res.status_code in [200, 201] else ""
+    if res.status_code in [200, 201]:
+        return res.json()['content']['download_url']
+    return ""
 
-# --- 3. BARRA LATERAL (ACESSO COORDENAÇÃO) ---
-st.sidebar.title("🔐 Acesso Restrito")
+# --- 3. BARRA LATERAL (COORDENAÇÃO) ---
+st.sidebar.title("🔐 Área Restrita")
 senha = st.sidebar.text_input("Senha da Coordenação", type="password")
 acesso_coord = (senha == "constantino2026")
 
@@ -83,13 +82,14 @@ if acesso_coord:
     st.sidebar.success("Acesso Liberado!")
     menu = st.sidebar.radio("Navegação", ["Lançar Questões", "Ver Banco de Questões"])
 else:
-    if senha: st.sidebar.error("Senha Incorreta")
+    if senha:
+        st.sidebar.error("Senha Incorreta")
     menu = "Lançar Questões"
 
 # --- 4. INTERFACE: LANÇAR QUESTÕES ---
 if menu == "Lançar Questões":
     st.title("📝 Portal de Simulados")
-    st.write("Escola Padre Constantino de Monte")
+    st.write("Bem-vindo, professor! Use o formulário abaixo.")
 
     with st.container():
         prof = st.text_input("👤 Nome do Professor")
@@ -112,15 +112,48 @@ if menu == "Lançar Questões":
             d, e = st.text_input("D)"), st.text_input("E)")
             gabarito = st.selectbox("Gabarito", ["A", "B", "C", "D", "E"])
 
+    # BLOCO DE ENVIO COM TRY/EXCEPT CORRIGIDO
     if st.button("🚀 FINALIZAR E LANÇAR"):
         if not prof or not turmas or not enunciado:
             st.warning("⚠️ Preencha os campos obrigatórios!")
         else:
             with st.spinner("Gravando dados..."):
                 try:
-                    url_img = upload_github(foto, f"{datetime.now().timestamp()}.jpg") if foto else ""
+                    # 1. Upload da imagem
+                    url_img = ""
+                    if foto:
+                        nome_img = f"{datetime.now().timestamp()}.jpg"
+                        url_img = upload_github(foto, nome_img)
+                    
+                    # 2. Conexão e Gravação
                     sheet = conectar_google_sheets()
                     for t in turmas:
-                        linha = [datetime.now().strftime("%d/%m/%Y %H:%M"), prof, disciplina, t, enunciado, url_img, a, b, c, d, e, gabarito]
+                        linha = [
+                            datetime.now().strftime("%d/%m/%Y %H:%M"), 
+                            prof, disciplina, t, enunciado, url_img, 
+                            a, b, c, d, e, gabarito
+                        ]
                         sheet.append_row(linha)
-                    st.success(f"✅ Enviado com sucesso!")
+                    
+                    # 3. Feedback final
+                    st.success("✅ Questão enviada com sucesso!")
+                    st.balloons()
+                    
+                except Exception as err:
+                    st.error(f"❌ Erro ao salvar: {err}")
+
+# --- 5. INTERFACE: ÁREA DA COORDENAÇÃO ---
+elif menu == "Ver Banco de Questões":
+    st.title("📊 Banco de Questões")
+    try:
+        sheet = conectar_google_sheets()
+        dados = sheet.get_all_records()
+        if dados:
+            df = pd.DataFrame(dados)
+            st.dataframe(df, use_container_width=True)
+            csv = df.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Baixar Planilha", csv, "simulado.csv", "text/csv")
+        else:
+            st.info("Nenhuma questão encontrada.")
+    except Exception as e:
+        st.error(f"Erro ao ler planilha: {e}")
