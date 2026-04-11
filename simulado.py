@@ -11,17 +11,13 @@ from io import BytesIO
 # --- CONFIGURAÇÕES DA PÁGINA ---
 st.set_page_config(page_title="Portal Escola Constantino", layout="centered")
 
-# --- 1. VISUAL À PROVA DE ERROS (CSS) ---
+# --- 1. VISUAL REFORÇADO (CSS) ---
 st.markdown("""
     <style>
-    html, body, [data-testid="stAppViewContainer"] {
-        background-color: #FFFFFF !important;
-    }
-    h1, h2, h3, p, label, span, div {
-        color: #000000 !important;
-    }
+    html, body, [data-testid="stAppViewContainer"] { background-color: #FFFFFF !important; }
+    h1, h2, h3, p, label, span, div { color: #000000 !important; }
     div[data-testid="stVerticalBlock"] > div {
-        background-color: #F3F4F6 !important;
+        background-color: #F8F9FA !important;
         padding: 20px !important;
         border-radius: 10px !important;
         border: 1px solid #D1D5DB !important;
@@ -43,41 +39,44 @@ def conectar_google_sheets():
         info_gs = st.secrets["connections"]["gsheets"]
         creds = Credentials.from_service_account_info(info_gs, scopes=scope)
         client = gspread.authorize(creds)
+        # Busca o link da planilha dentro do bloco connections.gsheets
         return client.open_by_url(info_gs["spreadsheet"]).get_worksheet(0)
     except Exception as e:
         st.error(f"Erro de Conexão: {e}")
         return None
 
-def upload_github(arquivo, nome_arquivo):
-    try:
-        token = st.secrets["github_token"]
-        # ⚠️ AJUSTE SEU REPOSITÓRIO AQUI
-        repo = "SEU_USUARIO/SEU_REPOSITORIO" 
-        url = f"https://api.github.com/repos/{repo}/contents/imagens/{nome_arquivo}"
-        conteudo = base64.b64encode(arquivo.read()).decode()
-        payload = {"message": f"Questão: {nome_arquivo}", "content": conteudo}
-        headers = {"Authorization": f"token {token}"}
-        res = requests.put(url, json=payload, headers=headers)
-        return res.json()['content']['download_url'] if res.status_code in [200, 201] else ""
-    except:
-        return ""
-
+# --- 3. FUNÇÃO DO WORD (REVISADA E EMPILHADA) ---
 def gerar_word(df, titulo_doc):
     doc = Document()
     doc.add_heading(f'Simulado - {titulo_doc}', 0)
-    df.columns = [str(c).strip().capitalize() for c in df.columns]
+    doc.add_paragraph(f'Escola Pe. Constantino de Monte - Gerado em: {datetime.now().strftime("%d/%m/%Y")}')
+    
+    # TRUQUE MÁGICO: Remove espaços e padroniza os nomes das colunas da planilha
+    df.columns = [str(c).strip().lower() for c in df.columns]
+
     for i, row in df.iterrows():
+        # Busca o enunciado de forma flexível (aceita 'enunciado', 'questão', etc)
+        texto_questao = row.get('enunciado', row.get('pergunta', row.get('questão', 'Sem texto na planilha')))
+        
         doc.add_heading(f'Questão {i+1}', level=2)
-        doc.add_paragraph(str(row.get('Enunciado', 'Sem texto')))
-        doc.add_paragraph(f"A) {row.get('A', '')} | B) {row.get('B', '')} | C) {row.get('C', '')}")
-        doc.add_paragraph(f"D) {row.get('D', '')} | E) {row.get('E', '')}")
-        doc.add_paragraph(f"Gabarito: {row.get('Gabarito', '')}")
+        doc.add_paragraph(str(texto_questao))
+        
+        # MUDANÇA: Alternativas uma sobre a outra (parágrafos separados)
+        doc.add_paragraph(f"A) {row.get('a', '')}")
+        doc.add_paragraph(f"B) {row.get('b', '')}")
+        doc.add_paragraph(f"C) {row.get('c', '')}")
+        doc.add_paragraph(f"D) {row.get('d', '')}")
+        doc.add_paragraph(f"E) {row.get('e', '')}")
+        
+        doc.add_paragraph(f"Gabarito: {row.get('gabarito', '')}")
+        doc.add_paragraph("-" * 40)
+
     buffer = BytesIO()
     doc.save(buffer)
     buffer.seek(0)
     return buffer
 
-# --- 3. ÁREA RESTRITA ---
+# --- 4. ÁREA RESTRITA ---
 st.sidebar.header("🔐 Coordenação")
 senha = st.sidebar.text_input("Senha", type="password")
 acesso_coord = (senha == "constantino2026")
@@ -88,53 +87,50 @@ if acesso_coord:
 else:
     menu = "Lançar Questões"
 
-# --- 4. TELA: LANÇAR ---
+# --- 5. TELA: LANÇAR ---
 if menu == "Lançar Questões":
-    st.title("📝 Portal de Simulados")
+    st.title("📝 Lançador de Simulados")
     with st.form("form_lançar"):
         prof = st.text_input("Nome do Professor")
         disc = st.selectbox("Disciplina", ["Português", "Matemática", "História", "Geografia", "Ciências", "Inglês", "Artes", "Ed. Física"])
         turmas = st.multiselect("Para quais turmas?", ["6º A", "6º B", "7º A", "7º B", "8º A", "8º B", "9º A", "9º B"])
         enunciado = st.text_area("Enunciado da Questão")
-        foto = st.file_uploader("Imagem (Opcional - Máx 10MB)", type=["jpg", "png"])
         
         c1, c2 = st.columns(2)
-        with c1: a, b, c = st.text_input("A)"), st.text_input("B)"), st.text_input("C)")
-        with c2: d, e, gab = st.text_input("D)"), st.text_input("E)"), st.selectbox("Gabarito", ["A", "B", "C", "D", "E"])
+        with c1: a, b, c = st.text_input("Alternativa A"), st.text_input("Alternativa B"), st.text_input("Alternativa C")
+        with c2: d, e, gab = st.text_input("Alternativa D"), st.text_input("Alternativa E"), st.selectbox("Gabarito", ["A", "B", "C", "D", "E"])
         
         btn_enviar = st.form_submit_button("🚀 SALVAR QUESTÃO")
 
     if btn_enviar:
         if not prof or not turmas or not enunciado:
-            st.warning("Preencha os campos obrigatórios!")
-        elif foto and foto.size > 10 * 1024 * 1024:
-            st.error("Imagem muito grande! Máximo 10MB.")
+            st.warning("⚠️ Preencha Nome, Turmas e Enunciado!")
         else:
             with st.spinner("Salvando..."):
-                url_img = upload_github(foto, f"{datetime.now().timestamp()}.jpg") if foto else ""
                 sheet = conectar_google_sheets()
                 if sheet:
                     try:
                         for t in turmas:
-                            linha = [datetime.now().strftime("%d/%m/%Y %H:%M"), prof, disc, t, enunciado, url_img, a, b, c, d, e, gab]
+                            # Ordem das colunas: Data, Professor, Disciplina, Turma, Enunciado, Foto, A, B, C, D, E, Gabarito
+                            linha = [datetime.now().strftime("%d/%m/%Y %H:%M"), prof, disc, t, enunciado, "", a, b, c, d, e, gab]
                             sheet.append_row(linha)
                         st.success(f"✅ Sucesso para as turmas: {', '.join(turmas)}")
                         st.balloons()
                     except Exception as e:
                         st.error(f"Erro ao salvar: {e}")
 
-# --- 5. TELA: VER BANCO (CORRIGIDA) ---
+# --- 6. TELA: VER BANCO ---
 elif menu == "Ver Banco de Questões":
-    st.title("📊 Banco de Questões")
+    st.title("📊 Gestão de Questões")
     
-    with st.spinner("Lendo planilha..."):
+    with st.spinner("Lendo banco de dados..."):
         sheet = conectar_google_sheets()
         
     if sheet:
         try:
             dados = sheet.get_all_records()
             if not dados:
-                st.info("Planilha vazia.")
+                st.info("Nenhuma questão encontrada na planilha.")
             else:
                 df = pd.DataFrame(dados)
                 
@@ -148,16 +144,15 @@ elif menu == "Ver Banco de Questões":
                 if f_t: df_f = df_f[df_f['Turma'].isin(f_t)]
                 if f_d: df_f = df_f[df_f['Disciplina'].isin(f_d)]
                 
-                st.write(f"Encontradas **{len(df_f)}** questões.")
+                st.write(f"Questões filtradas: **{len(df_f)}**")
                 st.dataframe(df_f)
                 
-                # Exportação
-                c_btn1, c_btn2 = st.columns(2)
-                with c_btn1:
-                    if st.button("📄 Gerar Word"):
+                c1, c2 = st.columns(2)
+                with c1:
+                    if st.button("📄 Gerar Word (Empilhado)"):
                         doc_p = gerar_word(df_f, "Escola Pe. Constantino")
-                        st.download_button("⬇️ Baixar .docx", doc_p, "simulado.docx")
-                with c_btn2:
+                        st.download_button("⬇️ Baixar .docx", doc_p, "simulado_escolar.docx")
+                with c2:
                     csv = df_f.to_csv(index=False).encode('utf-8')
                     st.download_button("📥 Baixar CSV", csv, "banco.csv")
         except Exception as e:
