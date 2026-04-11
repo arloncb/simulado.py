@@ -8,21 +8,11 @@ from datetime import datetime
 # --- CONFIGURAÇÕES DA PÁGINA ---
 st.set_page_config(page_title="Portal Simulado - Escola Constantino", layout="centered")
 
-# --- 1. VISUAL PREMIUM (CSS) - FORÇANDO CONTRASTE ---
+# --- 1. VISUAL PREMIUM (CSS) ---
 st.markdown("""
     <style>
-    /* Fundo cinza claro para destacar os blocos brancos */
-    .stApp {
-        background-color: #f4f7f9 !important;
-    }
-    
-    /* Títulos em Azul Escuro */
-    h1, h2, h3 {
-        color: #0f172a !important;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-
-    /* Cards Brancos com Sombra para os campos */
+    .stApp { background-color: #f4f7f9 !important; }
+    h1, h2, h3 { color: #0f172a !important; font-family: 'Segoe UI', sans-serif; }
     div[data-testid="stVerticalBlock"] > div {
         background-color: #ffffff !important;
         padding: 25px !important;
@@ -31,23 +21,17 @@ st.markdown("""
         margin-bottom: 15px !important;
         border: 1px solid #e2e8f0 !important;
     }
-
-    /* FORÇANDO COR DAS FONTES PARA PRETO/AZUL ESCURO */
     label p, .stMarkdown p, p {
         color: #1e293b !important;
         font-size: 19px !important;
         font-weight: 600 !important;
     }
-
-    /* Estilizando os campos de texto para ficarem visíveis */
     input, textarea, div[data-baseweb="select"] > div {
         background-color: #ffffff !important;
         color: #000000 !important;
         border: 2px solid #cbd5e1 !important;
         border-radius: 8px !important;
     }
-
-    /* Botão de Enviar - Verde Profissional */
     .stButton>button {
         width: 100%;
         background-color: #059669 !important;
@@ -56,33 +40,26 @@ st.markdown("""
         font-size: 20px !important;
         height: 3.5em !important;
         border-radius: 10px !important;
-        border: none !important;
         box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3) !important;
-        transition: 0.3s !important;
-    }
-    .stButton>button:hover {
-        background-color: #047857 !important;
-        transform: scale(1.01);
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. FUNÇÕES DE CONEXÃO AJUSTADAS ---
+# --- 2. FUNÇÕES DE CONEXÃO CORRIGIDAS ---
 
 def conectar_google_sheets():
-    # AJUSTADO: Agora usa a chave 'connections.gsheets' que você já tem!
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    creds_dict = st.secrets["connections"]["gsheets"]
-    creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+    # Acessando o caminho correto nos seus Secrets
+    info_gs = st.secrets["connections"]["gsheets"]
+    creds = Credentials.from_service_account_info(info_gs, scopes=scope)
     client = gspread.authorize(creds)
-    # AJUSTADO: Abre direto pela URL que está no seu secret
-    return client.open_by_url(st.secrets["spreadsheet"]).get_worksheet(0)
+    # Busca a URL que está dentro do bloco gsheets
+    return client.open_by_url(info_gs["spreadsheet"]).get_worksheet(0)
 
 def upload_github(arquivo, nome_arquivo):
-    # AJUSTADO: Usa o seu token do github
     token = st.secrets["github_token"]
-    # ⚠️ IMPORTANTE: Mude para o seu usuário e nome do repositório abaixo:
-    repo = "SEU_USUARIO/NOME_REPOSITORIO" 
+    # ⚠️ AJUSTE AQUI SEU USUARIO/REPOSITORIO
+    repo = "SEU_USUARIO/SEU_REPOSITORIO" 
     url = f"https://api.github.com/repos/{repo}/contents/imagens/{nome_arquivo}"
     conteudo = base64.b64encode(arquivo.read()).decode()
     payload = {"message": f"Questão: {nome_arquivo}", "content": conteudo}
@@ -96,62 +73,40 @@ st.title("📝 Portal de Simulados")
 st.write("Escola Padre Constantino de Monte")
 
 with st.container():
-    prof = st.text_input("👤 Nome do Professor", placeholder="Digite seu nome...")
+    prof = st.text_input("👤 Nome do Professor")
     disciplina = st.selectbox("📚 Disciplina", ["Português", "Matemática", "História", "Geografia", "Ciências", "Inglês", "Artes", "Ed. Física"])
-    
-    # MULTISELEÇÃO DE TURMAS
-    turmas = st.multiselect(
-        "🏫 Para quais turmas é esta questão?", 
-        ["6º A", "6º B", "7º A", "7º B", "8º A", "8º B", "9º A", "9º B"],
-        help="Você pode selecionar várias turmas de uma vez."
-    )
+    turmas = st.multiselect("🏫 Para quais turmas?", ["6º A", "6º B", "7º A", "7º B", "8º A", "8º B", "9º A", "9º B"])
 
 with st.container():
-    enunciado = st.text_area("✍️ Enunciado da Questão", placeholder="Escreva a pergunta aqui...")
-    
-    # LIMITE DE 10MB
-    foto = st.file_uploader("🖼️ Imagem (Opcional - Máx 10MB)", type=["jpg", "jpeg", "png"])
+    enunciado = st.text_area("✍️ Enunciado da Questão")
+    foto = st.file_uploader("🖼️ Imagem (Máx 10MB)", type=["jpg", "jpeg", "png"])
     if foto and foto.size > 10 * 1024 * 1024:
-        st.error("🚨 Imagem muito pesada! Escolha uma de até 10MB.")
+        st.error("🚨 Imagem muito grande! Escolha uma de até 10MB.")
         foto = None
 
 with st.container():
     st.write("🎯 **Alternativas**")
     c1, c2 = st.columns(2)
     with c1:
-        a = st.text_input("A)")
-        b = st.text_input("B)")
-        c = st.text_input("C)")
+        a, b, c = st.text_input("A)"), st.text_input("B)"), st.text_input("C)")
     with c2:
-        d = st.text_input("D)")
-        e = st.text_input("E)")
+        d, e = st.text_input("D)"), st.text_input("E)")
         gabarito = st.selectbox("Gabarito", ["A", "B", "C", "D", "E"])
 
 # --- 4. ENVIO ---
 
-if st.button("🚀 LANÇAR QUESTÃO"):
+if st.button("🚀 FINALIZAR E LANÇAR"):
     if not prof or not turmas or not enunciado:
-        st.warning("⚠️ Preencha o nome, turmas e enunciado!")
+        st.warning("⚠️ Preencha os campos obrigatórios!")
     else:
-        with st.spinner("Salvando..."):
+        with st.spinner("Gravando dados..."):
             try:
-                url_img = ""
-                if foto:
-                    nome_img = f"{datetime.now().timestamp()}.jpg"
-                    url_img = upload_github(foto, nome_img)
-                
+                url_img = upload_github(foto, f"{datetime.now().timestamp()}.jpg") if foto else ""
                 sheet = conectar_google_sheets()
-                
-                # LOOP PARA SALVAR UMA LINHA POR TURMA
                 for t in turmas:
-                    dados = [
-                        datetime.now().strftime("%d/%m/%Y %H:%M"),
-                        prof, disciplina, t, enunciado, url_img,
-                        a, b, c, d, e, gabarito
-                    ]
-                    sheet.append_row(dados)
-                
-                st.success(f"✅ Questão enviada para as turmas: {', '.join(turmas)}")
+                    linha = [datetime.now().strftime("%d/%m/%Y %H:%M"), prof, disciplina, t, enunciado, url_img, a, b, c, d, e, gabarito]
+                    sheet.append_row(linha)
+                st.success(f"✅ Enviado para: {', '.join(turmas)}")
                 st.balloons()
-            except Exception as e:
-                st.error(f"❌ Erro: {e}")
+            except Exception as err:
+                st.error(f"❌ Erro: {err}")
