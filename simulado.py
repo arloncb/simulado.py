@@ -8,35 +8,31 @@ import pandas as pd
 from docx import Document
 from io import BytesIO
 
-# --- CONFIGURAÇÕES INICIAIS ---
+# --- CONFIGURAÇÕES ---
 st.set_page_config(page_title="Portal Escola Constantino", layout="centered")
 
-# --- 1. VISUAL À PROVA DE ERROS (CSS) ---
+# --- 1. VISUAL ESTABILIZADO (CSS) ---
 st.markdown("""
     <style>
-    /* Força fundo branco e texto preto para evitar tela preta */
-    html, body, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
-        background-color: #FFFFFF !important;
+    /* Fundo claro padrão */
+    .stApp { background-color: white; }
+    
+    /* Forçar textos principais para Preto */
+    h1, h2, h3, h4, p, label { color: #111111 !important; }
+    
+    /* Estilo dos Cards de Pergunta */
+    .st-emotion-cache-1ky8h6r { 
+        background-color: #f1f3f5; 
+        padding: 20px; 
+        border-radius: 10px; 
     }
-    h1, h2, h3, p, label, span, div {
-        color: #000000 !important;
-    }
-    /* Estilo dos blocos (Cards) */
-    div[data-testid="stVerticalBlock"] > div {
-        background-color: #F3F4F6 !important;
-        padding: 20px !important;
-        border-radius: 10px !important;
-        border: 1px solid #D1D5DB !important;
-    }
-    /* Botão Verde */
+    
+    /* Botão de Enviar */
     .stButton>button {
         width: 100%;
-        background-color: #16A34A !important;
-        color: #FFFFFF !important;
-        font-weight: bold !important;
-        border-radius: 8px !important;
-        height: 3.5em !important;
-        border: none !important;
+        background-color: #28a745 !important;
+        color: white !important;
+        font-weight: bold;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -46,54 +42,33 @@ st.markdown("""
 def conectar_google_sheets():
     try:
         scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+        # Pega a chave dos secrets
         info_gs = st.secrets["connections"]["gsheets"]
         creds = Credentials.from_service_account_info(info_gs, scopes=scope)
         client = gspread.authorize(creds)
+        # Abre a planilha pelo link salvo nos secrets
         return client.open_by_url(info_gs["spreadsheet"]).get_worksheet(0)
     except Exception as e:
-        st.error(f"Erro de Conexão: {e}")
+        st.error(f"Erro ao conectar com a Planilha: {e}")
         return None
 
-def upload_github(arquivo, nome_arquivo):
-    try:
-        token = st.secrets["github_token"]
-        # ⚠️ LEMBRE DE COLOCAR SEU REPOSITÓRIO REAL AQUI
-        repo = "SEU_USUARIO/SEU_REPOSITORIO" 
-        url = f"https://api.github.com/repos/{repo}/contents/imagens/{nome_arquivo}"
-        conteudo = base64.b64encode(arquivo.read()).decode()
-        payload = {"message": f"Questão: {nome_arquivo}", "content": conteudo}
-        headers = {"Authorization": f"token {token}"}
-        res = requests.put(url, json=payload, headers=headers)
-        return res.json()['content']['download_url'] if res.status_code in [200, 201] else ""
-    except:
-        return ""
-
-# --- 3. FUNÇÃO DO WORD (CORRIGIDA) ---
 def gerar_word(df, titulo_doc):
     doc = Document()
     doc.add_heading(f'Simulado - {titulo_doc}', 0)
-    doc.add_paragraph(f'Escola Padre Constantino de Monte - Data: {datetime.now().strftime("%d/%m/%Y")}')
-    
-    # Padroniza as colunas (Evita erro de maiúscula/minúscula)
+    # Padroniza nomes das colunas
     df.columns = [str(c).strip().capitalize() for c in df.columns]
-
     for i, row in df.iterrows():
-        doc.add_paragraph(f'\nQuestão {i+1} ({row.get("Disciplina", "-")} - {row.get("Turma", "-")})', style='Heading 2')
-        doc.add_paragraph(str(row.get('Enunciado', 'Sem enunciado')))
-        doc.add_paragraph(f"A) {row.get('A', '')}")
-        doc.add_paragraph(f"B) {row.get('B', '')}")
-        doc.add_paragraph(f"C) {row.get('C', '')}")
-        doc.add_paragraph(f"D) {row.get('D', '')}")
-        doc.add_paragraph(f"E) {row.get('E', '')}")
+        doc.add_heading(f'Questão {i+1}', level=2)
+        doc.add_paragraph(str(row.get('Enunciado', 'Sem texto')))
+        doc.add_paragraph(f"A) {row.get('A', '')} | B) {row.get('B', '')} | C) {row.get('C', '')}")
+        doc.add_paragraph(f"D) {row.get('D', '')} | E) {row.get('E', '')}")
         doc.add_paragraph(f"Gabarito: {row.get('Gabarito', '')}")
-        doc.add_paragraph("-" * 20)
-
     buffer = BytesIO()
     doc.save(buffer)
     buffer.seek(0)
     return buffer
 
-# --- 4. BARRA LATERAL (COORDENAÇÃO) ---
+# --- 3. MENU LATERAL ---
 st.sidebar.header("🔐 Área Restrita")
 senha = st.sidebar.text_input("Senha da Coordenação", type="password")
 acesso_coord = (senha == "constantino2026")
@@ -104,46 +79,46 @@ if acesso_coord:
 else:
     menu = "Lançar Questões"
 
-# --- 5. INTERFACE: LANÇAR QUESTÕES ---
+# --- 4. TELA: LANÇAR QUESTÕES ---
 if menu == "Lançar Questões":
     st.title("📝 Lançador de Simulados")
     
-    with st.container():
-        prof = st.text_input("👤 Nome do Professor")
-        disc = st.selectbox("📚 Disciplina", ["Português", "Matemática", "História", "Geografia", "Ciências", "Inglês", "Artes", "Ed. Física"])
-        turmas = st.multiselect("🏫 Para quais turmas?", ["6º A", "6º B", "7º A", "7º B", "8º A", "8º B", "9º A", "9º B"])
-
-    with st.container():
-        enunciado = st.text_area("✍️ Enunciado da Questão")
-        foto = st.file_uploader("🖼️ Imagem (Opcional - Máx 10MB)", type=["jpg", "png"])
-        if foto and foto.size > 10 * 1024 * 1024:
-            st.error("🚨 Imagem muito grande!")
-            foto = None
-
-    with st.container():
-        st.write("🎯 **Alternativas**")
-        c1, c2 = st.columns(2)
-        with c1:
-            alt_a, alt_b, alt_c = st.text_input("A)"), st.text_input("B)"), st.text_input("C)")
-        with c2:
-            alt_d, alt_e = st.text_input("D)"), st.text_input("E)")
+    with st.form("form_questoes"):
+        prof = st.text_input("Nome do Professor")
+        disc = st.selectbox("Disciplina", ["Português", "Matemática", "História", "Geografia", "Ciências", "Inglês", "Artes", "Ed. Física"])
+        turmas = st.multiselect("Para quais turmas?", ["6º A", "6º B", "7º A", "7º B", "8º A", "8º B", "9º A", "9º B"])
+        enunciado = st.text_area("Enunciado da Questão")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            a, b, c = st.text_input("A)"), st.text_input("B)"), st.text_input("C)")
+        with col2:
+            d, e = st.text_input("D)"), st.text_input("E)")
             correta = st.selectbox("Gabarito", ["A", "B", "C", "D", "E"])
+        
+        enviar = st.form_submit_button("🚀 SALVAR QUESTÃO")
 
-    if st.button("🚀 SALVAR E LANÇAR"):
+    if enviar:
         if not prof or not turmas or not enunciado:
-            st.warning("⚠️ Preencha Nome, Turmas e Enunciado!")
+            st.warning("Preencha os campos obrigatórios!")
         else:
-            with st.spinner("Salvando..."):
-                url_img = upload_github(foto, f"{datetime.now().timestamp()}.jpg") if foto else ""
-                sheet = conectar_google_sheets()
-                if sheet:
-                    try:
-                        for t in turmas:
-                            linha = [datetime.now().strftime("%d/%m/%Y %H:%M"), prof, disc, t, enunciado, url_img, alt_a, alt_b, alt_c, alt_d, alt_e, correta]
-                            sheet.append_row(linha)
-                        st.success("✅ Sucesso!")
-                        st.balloons()
-                    except Exception as e:
-                        st.error(f"Erro: {e}")
+            sheet = conectar_google_sheets()
+            if sheet:
+                try:
+                    for t in turmas:
+                        linha = [datetime.now().strftime("%d/%m/%Y %H:%M"), prof, disc, t, enunciado, "", a, b, c, d, e, correta]
+                        sheet.append_row(linha)
+                    st.success("✅ Questão salva!")
+                    st.balloons()
+                except Exception as e:
+                    st.error(f"Erro ao salvar: {e}")
 
-# --- 6. INTERFACE: COORD
+# --- 5. TELA: VER BANCO (COORDENAÇÃO) ---
+elif menu == "Ver Banco de Questões":
+    st.title("📊 Banco de Questões")
+    
+    # Checkpoint 1: Conexão
+    with st.spinner("Buscando dados na planilha..."):
+        sheet = conectar_google_sheets()
+        
+    if sheet:
