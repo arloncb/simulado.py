@@ -67,34 +67,36 @@ def gerar_word(df, titulo_doc):
     doc.add_paragraph(txt_cab)
 
     for i, row in df.iterrows():
-        disc = str(row.get('disciplina', '-')).upper()
+        disc = str(row.get('disciplina', row.get('Disciplina', '-'))).upper()
         txt_q = f'Questão {i+1} - {disc}'
         doc.add_heading(txt_q, level=2)
         
-        hab = str(row.get('habilidade', 'Não informada'))
+        hab = str(row.get('habilidade', row.get('Habilidade', 'Não informada')))
         doc.add_paragraph(f'Habilidade: {hab}')
         
-        doc.add_paragraph("") 
+        doc.add_paragraph("")
         
-        enunc = row.get('enunciado', row.get('pergunta', 'Sem texto'))
+        enunc = row.get('pergunta', row.get('enunciado', 'Sem texto'))
         doc.add_paragraph(str(enunc))
         
-        # O BLOCO QUE DEU ERRO AGORA ESTÁ 100% ALINHADO
-        url_foto = str(row.get('foto', row.get('imagem', ''))).strip()
+        url_foto = str(row.get('link imagem', row.get('link_imagem', row.get('foto', row.get('imagem', ''))))).strip()
         if url_foto.startswith('http'):
             try:
-                req_img = requests.get(url_foto, timeout=5)
-                if req_img.status_code == 200:
+                headers_req = {"User-Agent": "Mozilla/5.0"}
+                req_img = requests.get(url_foto, timeout=10, headers=headers_req)
+                if req_img.status_code == 200 and len(req_img.content) > 0:
                     img_io = BytesIO(req_img.content)
                     doc.add_picture(img_io, width=Inches(3.5))
+                else:
+                    doc.add_paragraph(f"[Imagem não carregada - status {req_img.status_code}]")
             except Exception as e:
-                doc.add_paragraph("[Erro ao carregar a imagem da questão]")
+                doc.add_paragraph(f"[Erro ao carregar imagem: {e}]")
         
-        doc.add_paragraph(f"A) {row.get('a', '')}")
-        doc.add_paragraph(f"B) {row.get('b', '')}")
-        doc.add_paragraph(f"C) {row.get('c', '')}")
-        doc.add_paragraph(f"D) {row.get('d', '')}")
-        doc.add_paragraph(f"E) {row.get('e', '')}")
+        doc.add_paragraph(f"A) {row.get('a', row.get('A', ''))}")
+        doc.add_paragraph(f"B) {row.get('b', row.get('B', ''))}")
+        doc.add_paragraph(f"C) {row.get('c', row.get('C', ''))}")
+        doc.add_paragraph(f"D) {row.get('d', row.get('D', ''))}")
+        doc.add_paragraph(f"E) {row.get('e', row.get('E', ''))}")
         
         doc.add_paragraph("-" * 40)
 
@@ -185,7 +187,6 @@ elif menu == "Banco":
             else:
                 df = pd.DataFrame(dados)
                 
-                # Tradutor de colunas estruturado passo a passo
                 colunas_limpas = []
                 for c in df.columns:
                     c_limpo = str(c).strip().lower()
