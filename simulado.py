@@ -332,34 +332,22 @@ else:
                                     t = str(val).strip()
                                     return t if usar_unicode else t.encode('latin-1', 'replace').decode('latin-1')
 
-                                # Página de rosto
-                                pdf.add_page()
-                                pdf.set_font(fn, "B", 16)
-                                pdf.cell(0, 10, clean("SIDE - Sistema Integrado de Desempenho Escolar"), ln=True, align="C")
-                                pdf.ln(5)
-                                pdf.set_font(fn, "", 12)
-                                pdf.cell(0, 8, clean("Banco de Questões para Simulados"), ln=True, align="C")
-                                pdf.cell(0, 8, clean(f"Gerado em: {datetime.now().strftime('%d/%m/%Y às %H:%M')}"), ln=True, align="C")
-                                pdf.cell(0, 8, clean(f"Total de questões: {len(df_v)}"), ln=True, align="C")
-                                
                                 l_util = pdf.w - 2 * pdf.l_margin
                                 gabs = []
                                 
-                                # Questões
+                                # Questões (sem página de rosto e sem cabeçalho técnico)
                                 for idx, (_, r) in enumerate(df_v.iterrows(), 1):
                                     pdf.add_page()
                                     
                                     # Gabarito
                                     correta = r.get('Correta', 'N/A')
-                                    gabs.append(f"Q{idx}: {correta}")
+                                    gabs.append(f"Questão {idx}: {correta}")
                                     
-                                    # Cabeçalho da questão
-                                    pdf.set_font(fn, "B", 10)
-                                    header_txt = f"QUESTÃO {idx:02d} | {r.get('Disciplina', 'N/A')} | ({r.get('Habilidade', 'N/A')}) | Turma: {r.get('Turma', 'N/A')}"
-                                    pdf.multi_cell(l_util, 6, clean(header_txt))
+                                    # Enunciado (direto, sem cabeçalho)
+                                    pdf.set_font(fn, "B", 12)
+                                    pdf.multi_cell(l_util, 6, clean(f"QUESTÃO {idx:02d}"))
                                     pdf.ln(2)
                                     
-                                    # Enunciado
                                     pdf.set_font(fn, "", 11)
                                     pergunta = clean(r.get("Pergunta"))
                                     if pergunta:
@@ -372,13 +360,7 @@ else:
                                         texto_alt = clean(r.get(l))
                                         if texto_alt:
                                             pdf.set_x(pdf.l_margin + 8)
-                                            # Destaca a alternativa correta
-                                            if l == correta:
-                                                pdf.set_font(fn, "B", 10)
-                                                pdf.multi_cell(l_util - 8, 6, clean(f"({l}) {texto_alt} ✓"))
-                                                pdf.set_font(fn, "", 10)
-                                            else:
-                                                pdf.multi_cell(l_util - 8, 6, clean(f"({l}) {texto_alt}"))
+                                            pdf.multi_cell(l_util - 8, 6, clean(f"({l}) {texto_alt}"))
                                     
                                     pdf.ln(4)
                                     pdf.set_draw_color(200, 200, 200)
@@ -386,10 +368,10 @@ else:
                                     pdf.set_draw_color(0, 0, 0)
                                     pdf.ln(6)
 
-                                # Gabarito
+                                # Gabarito (página final)
                                 pdf.add_page()
                                 pdf.set_font(fn, "B", 14)
-                                pdf.cell(l_util, 10, clean("GABARITO DE REFERÊNCIA"), ln=True, align="C")
+                                pdf.cell(l_util, 10, clean("GABARITO"), ln=True, align="C")
                                 pdf.ln(8)
                                 pdf.set_font(fn, "", 11)
                                 for i in range(0, len(gabs), 3):
@@ -405,7 +387,7 @@ else:
                                 st.download_button(
                                     "⬇️ Baixar Banco de Questões (PDF)", 
                                     data=pdf_bytes, 
-                                    file_name=f"banco_questoes_side_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                                    file_name=f"banco_questoes_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
                                     use_container_width=True,
                                     key="download_pdf"
                                 )
