@@ -109,7 +109,6 @@ LISTA_DISCS = [
     "Educação Física", "Leitura e Produção de texto",
 ]
 SENHA_COORD = "coord2026"
-ENUN_MIN_CHARS = 20
 
 # ─── ESTADO INICIAL ───────────────────────────────────────────────────────────
 _defaults = {
@@ -196,11 +195,10 @@ if perfil == "👨‍🏫 Professor(a)":
             placeholder="Digite o enunciado completo da questão…",
         )
 
-        # Contador de caracteres (lê do state porque o form ainda não atualizou)
+        # Contador de caracteres — apenas informativo
         n_chars = len(st.session_state["q_enun"])
-        css_cls = "char-ok" if n_chars >= ENUN_MIN_CHARS else "char-warn"
         st.markdown(
-            f'<p class="char-count {css_cls}">{n_chars} / {ENUN_MIN_CHARS} caracteres mínimos</p>',
+            f'<p class="char-count">{n_chars} caractere(s)</p>',
             unsafe_allow_html=True,
         )
 
@@ -229,11 +227,8 @@ if perfil == "👨‍🏫 Professor(a)":
                 erros.append("**Nome do(a) Professor(a)** não pode estar vazio.")
             if not habilidade.strip():
                 erros.append("**Habilidade MS** não pode estar vazia.")
-            if len(enunciado.strip()) < ENUN_MIN_CHARS:
-                erros.append(
-                    f"**Enunciado** deve ter pelo menos {ENUN_MIN_CHARS} caracteres "
-                    f"(atual: {len(enunciado.strip())})."
-                )
+            if not enunciado.strip():
+                erros.append("**Enunciado** não pode estar vazio.")
             for letra, valor in [("A", alt_a), ("B", alt_b), ("C", alt_c), ("D", alt_d)]:
                 if not valor.strip():
                     erros.append(f"**Alternativa {letra}** não pode estar vazia.")
@@ -377,41 +372,58 @@ else:
         # PDF
         with exp2:
             if st.button("📄 Gerar e Baixar PDF", use_container_width=True):
+
+                # Caminhos das fontes DejaVu (disponíveis no Streamlit Cloud / Ubuntu)
+                FONT_DIR = "/usr/share/fonts/truetype/dejavu"
+                FONT_REG  = f"{FONT_DIR}/DejaVuSans.ttf"
+                FONT_BOLD = f"{FONT_DIR}/DejaVuSans-Bold.ttf"
+                FONT_ITAL = f"{FONT_DIR}/DejaVuSans-Oblique.ttf"
+
+                # Helper: garante string segura e sem None
+                def txt(value):
+                    return str(value) if value is not None else ""
+
                 pdf = FPDF()
                 pdf.set_auto_page_break(auto=True, margin=15)
+
+                # Registra as fontes TTF (suporte completo a UTF-8 / português)
+                pdf.add_font("DV",  "",  FONT_REG,  uni=True)
+                pdf.add_font("DV",  "B", FONT_BOLD, uni=True)
+                pdf.add_font("DV",  "I", FONT_ITAL, uni=True)
+
                 pdf.add_page()
 
-                # Cabeçalho do PDF
-                pdf.set_font("Helvetica", "B", 15)
-                pdf.cell(0, 10, "Portal de Simulados — SIDE", ln=True, align="C")
-                pdf.set_font("Helvetica", "", 10)
-                pdf.cell(0, 7, "E.E. Padre Constantino de Monte — Maracaju/MS", ln=True, align="C")
-                pdf.set_font("Helvetica", "I", 8)
-                pdf.cell(0, 6, f"Gerado em {datetime.now().strftime('%d/%m/%Y às %H:%M')}", ln=True, align="C")
+                # Cabecalho do PDF
+                pdf.set_font("DV", "B", 15)
+                pdf.cell(0, 10, "Portal de Simulados - SIDE", ln=True, align="C")
+                pdf.set_font("DV", "", 10)
+                pdf.cell(0, 7, "E.E. Padre Constantino de Monte - Maracaju/MS", ln=True, align="C")
+                pdf.set_font("DV", "I", 8)
+                pdf.cell(0, 6, f"Gerado em {datetime.now().strftime('%d/%m/%Y as %H:%M')}", ln=True, align="C")
                 pdf.ln(6)
 
                 for idx, (_, row) in enumerate(df_view.iterrows(), start=1):
-                    # Cabeçalho da questão
-                    pdf.set_fill_color(240, 240, 240)
-                    pdf.set_font("Helvetica", "B", 10)
+                    # Cabecalho da questao
+                    pdf.set_fill_color(235, 235, 235)
+                    pdf.set_font("DV", "B", 10)
                     header_txt = (
-                        f"Q{idx}  |  {row.get('Disciplina', '')}  |  "
-                        f"{row.get('Turma', '')}  |  Hab: {row.get('Habilidade', '')}"
+                        f"Q{idx}  |  {txt(row.get('Disciplina'))}  |  "
+                        f"{txt(row.get('Turma'))}  |  Hab: {txt(row.get('Habilidade'))}"
                     )
                     pdf.multi_cell(0, 7, header_txt, fill=True)
 
                     # Enunciado
-                    pdf.set_font("Helvetica", "", 9)
-                    pdf.multi_cell(0, 6, row.get("Enunciado", ""))
+                    pdf.set_font("DV", "", 9)
+                    pdf.multi_cell(0, 6, txt(row.get("Enunciado")))
                     pdf.ln(1)
 
                     # Alternativas
                     for letra in ["A", "B", "C", "D"]:
-                        pdf.multi_cell(0, 6, f"   {letra})  {row.get(letra, '')}")
+                        pdf.multi_cell(0, 6, f"   {letra})  {txt(row.get(letra))}")
 
                     # Gabarito
-                    pdf.set_font("Helvetica", "B", 9)
-                    pdf.cell(0, 7, f"   Gabarito: {row.get('Gabarito', '')}", ln=True)
+                    pdf.set_font("DV", "B", 9)
+                    pdf.cell(0, 7, f"   Gabarito: {txt(row.get('Gabarito'))}", ln=True)
                     pdf.ln(4)
 
                 pdf_bytes = bytes(pdf.output())
