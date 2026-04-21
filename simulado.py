@@ -55,11 +55,10 @@ st.markdown("""
         color: white; border: none; font-weight: 600; width: 100%;
         border-radius: 8px; padding: 0.65rem; transition: 0.2s;
     }
-    .char-count { font-size: 0.78rem; color: #9ca3af; margin-top: -10px; margin-bottom: 8px; }
 </style>
 """, unsafe_allow_html=True)
 
-# ─── CONSTANTES ATUALIZADAS (CONFORME LEDGER) ──────────────────────────────────
+# ─── CONSTANTES ATUALIZADAS ───────────────────────────────────────────────────
 LISTA_TURMAS = ["4° A", "5° A", "6° A", "6° B", "6° C", "7° A", "8° A", "9° A", "9° B", "9° C", "9° D", "1° A", "1° B", "2° A", "3° A"]
 LISTA_DISCS = ["Língua Portuguesa", "Matemática", "Arte", "Língua Inglesa", "Ciências", "História", "Geografia", "Ensino Religioso", "Educação Física", "Leitura e Produção de texto"]
 SENHA_COORD = "coord2026"
@@ -104,7 +103,6 @@ if perfil == "👨‍🏫 Professor(a)":
         st.markdown('<p class="section-label">📝 Questão</p>', unsafe_allow_html=True)
         habilidade = st.text_input("Habilidade MS*", value=st.session_state["q_hab"])
         enunciado = st.text_area("Enunciado*", value=st.session_state["q_enun"], height=150)
-        st.markdown(f'<p class="char-count">{len(enunciado)} caractere(s)</p>', unsafe_allow_html=True)
         
         ca, cb = st.columns(2)
         with ca:
@@ -144,32 +142,14 @@ else:
     if senha == SENHA_COORD:
         try:
             df = conn.read(ttl=0)
-            if df.empty:
-                st.info("Nenhuma questão cadastrada.")
+            if df.empty: st.info("Nenhuma questão cadastrada.")
             else:
-                # Métricas
-                st.divider()
-                m1, m2, m3, m4 = st.columns(4)
-                def m_card(col, icon, val, lab):
-                    col.markdown(f'<div class="metric-card"><div class="metric-value">{icon} {val}</div><div class="metric-label">{lab}</div></div>', unsafe_allow_html=True)
-                m_card(m1, "📋", len(df), "Questões")
-                m_card(m2, "👨‍🏫", df["Professor(a)"].nunique(), "Professores")
-                m_card(m3, "📚", df["Disciplina"].nunique(), "Disciplinas")
-                m_card(m4, "🏫", df["Turma"].nunique(), "Turmas")
-
                 # Filtros
-                st.divider()
-                st.markdown('<p class="section-label">🔍 Filtros</p>', unsafe_allow_html=True)
+                st.markdown('<p class="section-label">🔍 Filtros para Exportação</p>', unsafe_allow_html=True)
                 f1, f2, f3 = st.columns(3)
-                with f1: 
-                    op_t = sorted([str(x) for x in df["Turma"].dropna().unique()])
-                    f_turma = st.multiselect("Turma:", op_t)
-                with f2:
-                    op_d = sorted([str(x) for x in df["Disciplina"].dropna().unique()])
-                    f_disc = st.multiselect("Disciplina:", op_d)
-                with f3:
-                    op_p = sorted([str(x) for x in df["Professor(a)"].dropna().unique()])
-                    f_prof = st.multiselect("Professor(a):", op_p)
+                with f1: op_t = sorted([str(x) for x in df["Turma"].dropna().unique()]); f_turma = st.multiselect("Turma:", op_t)
+                with f2: op_d = sorted([str(x) for x in df["Disciplina"].dropna().unique()]); f_disc = st.multiselect("Disciplina:", op_d)
+                with f3: op_p = sorted([str(x) for x in df["Professor(a)"].dropna().unique()]); f_prof = st.multiselect("Professor(a):", op_p)
 
                 df_v = df.copy()
                 if f_turma: df_v = df_v[df_v["Turma"].isin(f_turma)]
@@ -178,83 +158,89 @@ else:
 
                 st.dataframe(df_v, use_container_width=True, hide_index=True)
 
-                # Exportação (PDF REFORMULADO)
-                st.divider()
                 exp1, exp2 = st.columns(2)
                 with exp1:
                     csv = df_v.to_csv(index=False).encode("utf-8-sig")
                     st.download_button("⬇️ Baixar CSV (Excel)", data=csv, file_name="simulado.csv", use_container_width=True)
                 
                 with exp2:
-                    if st.button("📄 Gerar e Baixar PDF", use_container_width=True):
+                    if st.button("📄 Gerar e Baixar Prova PDF", use_container_width=True):
                         garantir_fontes()
                         pdf = FPDF()
-                        pdf.set_auto_page_break(auto=True, margin=15)
+                        pdf.set_auto_page_break(auto=True, margin=20)
                         
-                        # Definição de Fonte e Codificação
                         usar_unicode = False
                         if os.path.exists("DejaVuSans.ttf"):
                             pdf.add_font("SideFont", "", "DejaVuSans.ttf", uni=True)
                             pdf.add_font("SideFont", "B", "DejaVuSans-Bold.ttf", uni=True)
-                            fn = "SideFont"
-                            usar_unicode = True
-                        else:
-                            fn = "Helvetica"
+                            fn, usar_unicode = "SideFont", True
+                        else: fn = "Helvetica"
 
-                        # Função auxiliar para limpar o texto e remover o "nan"
                         def clean(val):
                             if pd.isna(val) or val is None: return ""
-                            texto = str(val).strip()
-                            if not usar_unicode:
-                                return texto.encode('latin-1', 'replace').decode('latin-1')
-                            return texto
+                            t = str(val).strip()
+                            return t if usar_unicode else t.encode('latin-1', 'replace').decode('latin-1')
 
                         pdf.add_page()
                         l_util = pdf.w - 2 * pdf.l_margin
 
-                        # Cabeçalho
-                        pdf.set_font(fn, "B", 15)
-                        pdf.cell(l_util, 10, clean("SIDE - Portal de Simulados"), ln=True, align="C")
-                        pdf.set_font(fn, "", 9)
-                        pdf.cell(l_util, 7, clean("E.E. Padre Constantino de Monte - Maracaju/MS"), ln=True, align="C")
-                        pdf.ln(5)
+                        # --- CABEÇALHO DA PROVA ---
+                        pdf.set_font(fn, "B", 12)
+                        pdf.cell(l_util, 7, clean("ESCOLA ESTADUAL PADRE CONSTANTINO DE MONTE"), ln=True, align="C")
+                        pdf.set_font(fn, "", 10)
+                        pdf.cell(l_util, 6, clean("Simulado Bimestral - Maracaju/MS"), ln=True, align="C")
+                        pdf.ln(4)
+                        
+                        # Campos do Aluno
+                        pdf.set_font(fn, "B", 10)
+                        pdf.cell(l_util, 8, clean("ESTUDANTE: __________________________________________________________________"), ln=True)
+                        pdf.cell(l_util/2, 8, clean("TURMA: __________"), ln=0)
+                        pdf.cell(l_util/2, 8, clean("DATA: ____/____/2026"), ln=1)
+                        pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.l_margin, pdf.get_y()) # Linha divisória
+                        pdf.ln(6)
 
                         gabs = []
                         for idx, (_, r) in enumerate(df_v.iterrows(), 1):
                             gabs.append(f"Q{idx}: {r.get('Gabarito')}")
                             
-                            # Título da Questão (Cinza)
-                            pdf.set_fill_color(240, 240, 240)
+                            # Cabeçalho da Questão
                             pdf.set_font(fn, "B", 10)
-                            header_txt = f"Q{idx} | {r.get('Disciplina')} | {r.get('Turma')} | Hab: {r.get('Habilidade')}"
-                            pdf.multi_cell(l_util, 7, clean(header_txt), fill=True)
+                            pdf.multi_cell(l_util, 6, clean(f"QUESTÃO {idx} | {r.get('Disciplina')} | ({r.get('Habilidade')})"))
+                            pdf.ln(1)
                             
                             # Enunciado
                             pdf.set_font(fn, "", 10)
-                            conteudo = clean(r.get("Enunciado"))
-                            if conteudo:
-                                pdf.multi_cell(l_util, 6, conteudo)
+                            pdf.multi_cell(l_util, 5, clean(r.get("Enunciado")))
+                            pdf.ln(3)
                             
-                            pdf.ln(1)
-                            # Alternativas
+                            # Alternativas (com recuo/identação)
                             for l in ["A", "B", "C", "D"]:
                                 texto_alt = clean(r.get(l))
                                 if texto_alt:
-                                    pdf.multi_cell(l_util, 6, f"   {l}) {texto_alt}")
+                                    pdf.set_x(pdf.l_margin + 8) # Recuo de 8mm
+                                    pdf.multi_cell(l_util - 8, 6, clean(f"({l}) {texto_alt}"))
+                            
                             pdf.ln(4)
+                            # Linha pontilhada opcional entre questões
+                            pdf.set_draw_color(200, 200, 200)
+                            pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.l_margin, pdf.get_y())
+                            pdf.ln(6)
+                            pdf.set_draw_color(0, 0, 0)
 
-                        # Página de Gabarito
+                        # --- GABARITO ---
                         pdf.add_page()
                         pdf.set_font(fn, "B", 14)
-                        pdf.cell(l_util, 10, clean("GABARITO OFICIAL"), ln=True, align="C")
-                        pdf.set_font(fn, "", 11)
+                        pdf.cell(l_util, 10, clean("GABARITO OFICIAL - SIDE"), ln=True, align="C")
                         pdf.ln(5)
-                        for i in range(0, len(gabs), 2):
-                            pdf.cell(80, 8, clean(gabs[i]))
-                            if i+1 < len(gabs): pdf.cell(80, 8, clean(gabs[i+1]))
+                        pdf.set_font(fn, "", 11)
+                        
+                        for i in range(0, len(gabs), 3): # 3 colunas para o gabarito
+                            pdf.cell(60, 8, clean(gabs[i]))
+                            if i+1 < len(gabs): pdf.cell(60, 8, clean(gabs[i+1]))
+                            if i+2 < len(gabs): pdf.cell(60, 8, clean(gabs[i+2]))
                             pdf.ln()
 
-                        st.download_button("⬇️ Clique para Baixar PDF", data=bytes(pdf.output()), file_name="simulado.pdf", use_container_width=True)
+                        st.download_button("⬇️ Baixar Prova Pronta (PDF)", data=bytes(pdf.output()), file_name="prova_simulado.pdf", use_container_width=True)
 
-        except Exception as e: st.error(f"Erro ao processar dados: {e}")
+        except Exception as e: st.error(f"Erro ao processar: {e}")
     elif senha: st.error("Senha incorreta.")
