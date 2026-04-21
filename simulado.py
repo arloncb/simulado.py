@@ -1,61 +1,54 @@
 import streamlit as st
 import pandas as pd
 
-# 1. Configurações Iniciais
-st.set_page_config(page_title="Sistema de Simulados - Padre Constantino", layout="wide")
+# 1. Configurações e Identidade
+st.set_page_config(page_title="Portal de Simulados - Padre Constantino", layout="wide")
+st.title("📚 Portal de Simulados")
+st.markdown("**Escola Estadual Padre Constantino de Monte**")
+st.divider()
 
-# Link da sua planilha de SIMULADOS (Pública no Google como 'Qualquer pessoa com o link')
-URL_PLANILHA_SIMULADOS = "https://docs.google.com/spreadsheets/d/1gPhMASo7yOsn5HhvLw6_rGkYbSkcBB_xUsgN8QgzhWw/export?format=csv"
+# 2. Link da Planilha (Verifique se este link está correto para evitar o erro de 'Arquivo não existe')
+#
+URL_BASE = "https://docs.google.com/spreadsheets/d/1gPhMASo7yOsn5HhvLw6_rGkYbSkcBB_xUsgN8QgzhWw/export?format=csv"
 
-# 2. Função para carregar as questões (Sem precisar de Secrets)
-def carregar_banco_questoes():
-    try:
-        # Lê a planilha de simulados diretamente
-        df = pd.read_csv(URL_PLANILHA_SIMULADOS)
-        return df
-    except Exception as e:
-        st.error(f"Erro ao conectar com o banco de questões: {e}")
-        return None
-
-# 3. Gerenciamento de Perfil (Barra Lateral)
+# 3. Navegação por Perfil (Barra Lateral)
 with st.sidebar:
-    st.title("🛡️ Acesso Restrito")
+    st.header("⚙️ Acesso")
     perfil = st.radio("Selecione seu Perfil:", ["Professor (a)", "Coordenação"])
     st.divider()
-    st.write(f"**Escola Estadual Padre Constantino de Monte**")
+    st.info("Sistema SIDE - Gestão de Simulados")
 
-# 4. Conteúdo Principal
-st.title("📚 Portal de Simulados")
-st.write("---")
-
+# --- ÁREA DO PROFESSOR (Restaurando o Lançamento Nativo) ---
 if perfil == "Professor (a)":
-    st.subheader("👨‍🏫 Área do Professor (a) - Lançamento e Consulta")
+    st.subheader("👨‍🏫 Lançamento de Questões")
     
-    tab1, tab2 = st.tabs(["🔍 Ver Banco de Questões", "🚀 Lançar Nova Questão"])
-    
-    with tab1:
-        df = carregar_banco_questoes()
-        if df is not None:
-            st.write("Aqui estão as questões já cadastradas no sistema:")
-            st.dataframe(df, use_container_width=True)
-    
-    with tab2:
-        st.info("Para evitar erros de conexão, o lançamento agora é feito via formulário seguro.")
-        # IMPORTANTE: Coloque aqui o link do Google Forms que alimenta a sua planilha de simulados
-        st.link_button("ABRIR FORMULÁRIO DE LANÇAMENTO", "https://docs.google.com/forms/d/SEU_LINK_AQUI", use_container_width=True)
-
-else:
-    st.subheader("🔑 Área da Coordenação - Gestão de Simulados")
-    
-    df = carregar_banco_questoes()
-    if df is not None:
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            st.write(f"Total de questões disponíveis: **{len(df)}**")
-        with col2:
-            # Opção de baixar o banco para conferência offline
-            csv = df.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Baixar Planilha (CSV)", csv, "banco_simulados.csv", "text/csv", use_container_width=True)
+    # Criando os campos que o professor usava antes
+    with st.form("form_lancamento"):
+        materia = st.selectbox("Disciplina:", ["Língua Portuguesa", "Matemática", "Arte", "Língua Inglesa", "Ciências"])
+        enunciado = st.text_area("Digite o enunciado da questão:")
         
-        st.divider()
+        col1, col2 = st.columns(2)
+        with col1:
+            alt_a = st.text_input("Alternativa A:")
+            alt_b = st.text_input("Alternativa B:")
+        with col2:
+            alt_c = st.text_input("Alternativa C:")
+            alt_d = st.text_input("Alternativa D:")
+            
+        correta = st.selectbox("Alternativa Correta:", ["A", "B", "C", "D"])
+        
+        btn_enviar = st.form_submit_button("🚀 CADASTRAR QUESTÃO")
+        
+        if btn_enviar:
+            st.warning("⚠️ Para salvar diretamente na planilha, precisamos finalizar a conexão do Secrets. Por enquanto, os dados acima não estão sendo gravados.")
+
+# --- ÁREA DA COORDENAÇÃO ---
+else:
+    st.subheader("🔑 Gestão da Coordenação")
+    try:
+        df = pd.read_csv(URL_BASE)
+        st.write(f"Total de questões cadastradas: {len(df)}")
         st.dataframe(df, use_container_width=True)
+    except Exception as e:
+        # Se o erro de 'Arquivo não existe' persistir, aparecerá aqui
+        st.error(f"Não foi possível ler a planilha. Verifique o compartilhamento no Google Drive. Erro: {e}")
