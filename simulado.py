@@ -318,36 +318,51 @@ else:
                                 pdf = FPDF()
                                 pdf.set_auto_page_break(auto=True, margin=20)
                                 
+                                # Força o uso da fonte Unicode para caracteres especiais
                                 usar_unicode = False
                                 if os.path.exists("DejaVuSans.ttf"):
                                     pdf.add_font("SideFont", "", "DejaVuSans.ttf", uni=True)
                                     pdf.add_font("SideFont", "B", "DejaVuSans-Bold.ttf", uni=True)
-                                    fn, usar_unicode = "SideFont", True
+                                    fn = "SideFont"
+                                    usar_unicode = True
                                 else:
                                     fn = "Helvetica"
 
                                 def clean(val):
+                                    """Limpa e prepara texto para o PDF"""
                                     if pd.isna(val) or val is None: 
                                         return ""
                                     t = str(val).strip()
-                                    return t if usar_unicode else t.encode('latin-1', 'replace').decode('latin-1')
+                                    if usar_unicode:
+                                        # Com Unicode, mantém os caracteres originais
+                                        return t
+                                    else:
+                                        # Sem Unicode, tenta codificar em latin-1
+                                        return t.encode('latin-1', 'replace').decode('latin-1')
 
                                 l_util = pdf.w - 2 * pdf.l_margin
                                 gabs = []
                                 
-                                # Questões (sem página de rosto e sem cabeçalho técnico)
+                                # Primeira página
+                                pdf.add_page()
+                                
+                                # Questões em sequência (sem quebra de página forçada)
                                 for idx, (_, r) in enumerate(df_v.iterrows(), 1):
-                                    pdf.add_page()
-                                    
-                                    # Gabarito
+                                    # Gabarito para página final
                                     correta = r.get('Correta', 'N/A')
                                     gabs.append(f"Questão {idx}: {correta}")
                                     
-                                    # Enunciado (direto, sem cabeçalho)
+                                    # Verifica se precisa de nova página
+                                    # Se a posição Y estiver muito próxima do final, adiciona nova página
+                                    if pdf.get_y() > 240:
+                                        pdf.add_page()
+                                    
+                                    # Título da questão
                                     pdf.set_font(fn, "B", 12)
                                     pdf.multi_cell(l_util, 6, clean(f"QUESTÃO {idx:02d}"))
                                     pdf.ln(2)
                                     
+                                    # Enunciado
                                     pdf.set_font(fn, "", 11)
                                     pergunta = clean(r.get("Pergunta"))
                                     if pergunta:
@@ -363,10 +378,13 @@ else:
                                             pdf.multi_cell(l_util - 8, 6, clean(f"({l}) {texto_alt}"))
                                     
                                     pdf.ln(4)
-                                    pdf.set_draw_color(200, 200, 200)
-                                    pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.l_margin, pdf.get_y())
-                                    pdf.set_draw_color(0, 0, 0)
-                                    pdf.ln(6)
+                                    
+                                    # Linha separadora (exceto na última questão)
+                                    if idx < len(df_v):
+                                        pdf.set_draw_color(200, 200, 200)
+                                        pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.l_margin, pdf.get_y())
+                                        pdf.set_draw_color(0, 0, 0)
+                                        pdf.ln(6)
 
                                 # Gabarito (página final)
                                 pdf.add_page()
@@ -374,6 +392,8 @@ else:
                                 pdf.cell(l_util, 10, clean("GABARITO"), ln=True, align="C")
                                 pdf.ln(8)
                                 pdf.set_font(fn, "", 11)
+                                
+                                # Layout do gabarito em colunas
                                 for i in range(0, len(gabs), 3):
                                     pdf.cell(60, 8, clean(gabs[i]))
                                     if i+1 < len(gabs): 
