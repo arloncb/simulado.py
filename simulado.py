@@ -64,7 +64,7 @@ LISTA_DISCS = ["Língua Portuguesa", "Matemática", "Arte", "Língua Inglesa", "
 SENHA_COORD = "coord2026"
 
 # Inicialização do session_state
-_defaults = {"prof_nome": "", "prof_turma": "6° A", "prof_disc": "Língua Portuguesa", "q_hab": "", "q_enun": "", "q_a": "", "q_b": "", "q_c": "", "q_d": ""}
+_defaults = {"prof_nome": "", "prof_turma": "6° A", "prof_disc": "Língua Portuguesa", "q_hab": "", "q_enun": "", "q_a": "", "q_b": "", "q_c": "", "q_d": "", "q_e": "", "q_imagem": ""}
 for k, v in _defaults.items():
     if k not in st.session_state: 
         st.session_state[k] = v
@@ -120,80 +120,92 @@ if perfil == "👨‍🏫 Professor(a)":
         st.divider()
         st.markdown('<p class="section-label">📝 Questão</p>', unsafe_allow_html=True)
         habilidade = st.text_input("Habilidade MS*", value=st.session_state["q_hab"])
-        enunciado = st.text_area("Enunciado*", value=st.session_state["q_enun"], height=150)
+        enunciado = st.text_area("Pergunta*", value=st.session_state["q_enun"], height=150)
+        
+        # Link da imagem (opcional)
+        link_imagem = st.text_input("🔗 Link da Imagem (opcional)", value=st.session_state["q_imagem"], 
+                                    placeholder="https://exemplo.com/imagem.jpg")
         
         ca, cb = st.columns(2)
         with ca:
             alt_a = st.text_input("Alternativa A*", value=st.session_state["q_a"])
             alt_b = st.text_input("Alternativa B*", value=st.session_state["q_b"])
-        with cb:
             alt_c = st.text_input("Alternativa C*", value=st.session_state["q_c"])
+        with cb:
             alt_d = st.text_input("Alternativa D*", value=st.session_state["q_d"])
+            alt_e = st.text_input("Alternativa E*", value=st.session_state["q_e"])
 
-        gabarito = st.radio("✅ Gabarito*", ["A", "B", "C", "D"], horizontal=True)
+        gabarito = st.radio("✅ Alternativa Correta*", ["A", "B", "C", "D", "E"], horizontal=True)
         
         # Preview da questão
         with st.expander("👁️ Pré-visualizar questão", expanded=False):
             if enunciado:
+                if link_imagem:
+                    st.image(link_imagem, caption="Imagem da questão", use_container_width=True)
                 st.markdown(f"**{enunciado}**")
                 st.markdown(f"A) {alt_a if alt_a else '...'}")
                 st.markdown(f"B) {alt_b if alt_b else '...'}")
                 st.markdown(f"C) {alt_c if alt_c else '...'}")
                 st.markdown(f"D) {alt_d if alt_d else '...'}")
-                st.markdown(f"✅ **Gabarito: {gabarito}**")
+                st.markdown(f"E) {alt_e if alt_e else '...'}")
+                st.markdown(f"✅ **Alternativa Correta: {gabarito}**")
             else:
-                st.info("Preencha o enunciado para pré-visualizar")
+                st.info("Preencha a pergunta para pré-visualizar")
         
         btn_salvar = st.form_submit_button("🚀 Cadastrar Questão")
 
         if btn_salvar:
             # Validações
             if not nome_professor or not habilidade or not enunciado:
-                st.error("⚠️ Preencha os campos obrigatórios (Nome, Habilidade e Enunciado).")
-            elif not all([alt_a, alt_b, alt_c, alt_d]):
-                st.error("⚠️ Todas as alternativas (A, B, C, D) são obrigatórias.")
+                st.error("⚠️ Preencha os campos obrigatórios (Nome, Habilidade e Pergunta).")
+            elif not all([alt_a, alt_b, alt_c, alt_d, alt_e]):
+                st.error("⚠️ Todas as alternativas (A, B, C, D, E) são obrigatórias.")
             elif conn:
                 try:
                     # Carrega dados atuais
                     df_atual = carregar_dados()
                     
-                    # Se não existir dados, cria DataFrame vazio
+                    # Se não existir dados, cria DataFrame vazio com o cabeçalho correto
                     if df_atual is None or df_atual.empty:
                         df_atual = pd.DataFrame(columns=[
-                            "Professor(a)", "Turma", "Disciplina", "Habilidade", 
-                            "Enunciado", "A", "B", "C", "D", "Gabarito", "Data"
+                            "Data", "Professor (a)", "Disciplina", "Turma", "Habilidade", 
+                            "Pergunta", "A", "B", "C", "D", "E", "Correta", "Link Imagem"
                         ])
                     
-                    # Cria nova linha
+                    # Cria nova linha com o cabeçalho correto
                     nova_linha = pd.DataFrame([{
-                        "Professor(a)": nome_professor, 
-                        "Turma": turma, 
+                        "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                        "Professor (a)": nome_professor,
                         "Disciplina": disciplina,
-                        "Habilidade": habilidade, 
-                        "Enunciado": enunciado, 
-                        "A": alt_a, 
+                        "Turma": turma,
+                        "Habilidade": habilidade,
+                        "Pergunta": enunciado,
+                        "A": alt_a,
                         "B": alt_b,
-                        "C": alt_c, 
-                        "D": alt_d, 
-                        "Gabarito": gabarito, 
-                        "Data": datetime.now().strftime("%d/%m/%Y %H:%M")
+                        "C": alt_c,
+                        "D": alt_d,
+                        "E": alt_e,
+                        "Correta": gabarito,
+                        "Link Imagem": link_imagem if link_imagem else ""
                     }])
                     
                     # Concatena e salva
                     df_final = pd.concat([df_atual, nova_linha], ignore_index=True)
                     conn.update(data=df_final)
                     
-                    # Atualiza session_state (incluindo a turma!)
+                    # Atualiza session_state
                     st.session_state.update({
                         "prof_nome": nome_professor, 
-                        "prof_turma": turma,  # ← CORRIGIDO: Agora salva a turma
+                        "prof_turma": turma,
                         "prof_disc": disciplina,
                         "q_hab": "", 
                         "q_enun": "", 
                         "q_a": "", 
                         "q_b": "", 
                         "q_c": "", 
-                        "q_d": ""
+                        "q_d": "",
+                        "q_e": "",
+                        "q_imagem": ""
                     })
                     
                     # Registra no log
@@ -227,7 +239,7 @@ else:
                 st.info("📭 Nenhuma questão cadastrada ainda.")
             else:
                 # Verifica se as colunas existem antes de usar
-                colunas_necessarias = ["Turma", "Disciplina", "Professor(a)"]
+                colunas_necessarias = ["Turma", "Disciplina", "Professor (a)"]
                 colunas_presentes = [col for col in colunas_necessarias if col in df.columns]
                 
                 if len(colunas_presentes) == len(colunas_necessarias):
@@ -235,25 +247,34 @@ else:
                     f1, f2, f3 = st.columns(3)
                     
                     with f1:
-                        op_t = sorted([str(x) for x in df["Turma"].dropna().unique()]) if "Turma" in df.columns else []
-                        f_turma = st.multiselect("Turma:", op_t)
+                        if "Turma" in df.columns:
+                            op_t = sorted([str(x) for x in df["Turma"].dropna().unique()])
+                            f_turma = st.multiselect("Turma:", op_t)
+                        else:
+                            f_turma = []
                     
                     with f2:
-                        op_d = sorted([str(x) for x in df["Disciplina"].dropna().unique()]) if "Disciplina" in df.columns else []
-                        f_disc = st.multiselect("Disciplina:", op_d)
+                        if "Disciplina" in df.columns:
+                            op_d = sorted([str(x) for x in df["Disciplina"].dropna().unique()])
+                            f_disc = st.multiselect("Disciplina:", op_d)
+                        else:
+                            f_disc = []
                     
                     with f3:
-                        op_p = sorted([str(x) for x in df["Professor(a)"].dropna().unique()]) if "Professor(a)" in df.columns else []
-                        f_prof = st.multiselect("Professor(a):", op_p)
+                        if "Professor (a)" in df.columns:
+                            op_p = sorted([str(x) for x in df["Professor (a)"].dropna().unique()])
+                            f_prof = st.multiselect("Professor(a):", op_p)
+                        else:
+                            f_prof = []
 
                     # Aplica filtros
                     df_v = df.copy()
-                    if f_turma: 
+                    if f_turma and "Turma" in df_v.columns: 
                         df_v = df_v[df_v["Turma"].isin(f_turma)]
-                    if f_disc: 
+                    if f_disc and "Disciplina" in df_v.columns: 
                         df_v = df_v[df_v["Disciplina"].isin(f_disc)]
-                    if f_prof: 
-                        df_v = df_v[df_v["Professor(a)"].isin(f_prof)]
+                    if f_prof and "Professor (a)" in df_v.columns: 
+                        df_v = df_v[df_v["Professor (a)"].isin(f_prof)]
                 else:
                     df_v = df.copy()
                     st.warning("⚠️ Algumas colunas esperadas não foram encontradas. Exibindo todos os dados sem filtros.")
@@ -265,9 +286,13 @@ else:
                 with col2:
                     if "Turma" in df_v.columns:
                         st.metric("🏫 Turmas", df_v["Turma"].nunique())
+                    else:
+                        st.metric("🏫 Turmas", 0)
                 with col3:
                     if "Disciplina" in df_v.columns:
                         st.metric("📚 Disciplinas", df_v["Disciplina"].nunique())
+                    else:
+                        st.metric("📚 Disciplinas", 0)
 
                 st.divider()
                 st.dataframe(df_v, use_container_width=True, hide_index=True)
@@ -323,7 +348,10 @@ else:
                                 # Questões
                                 for idx, (_, r) in enumerate(df_v.iterrows(), 1):
                                     pdf.add_page()
-                                    gabs.append(f"Q{idx}: {r.get('Gabarito', 'N/A')}")
+                                    
+                                    # Gabarito
+                                    correta = r.get('Correta', 'N/A')
+                                    gabs.append(f"Q{idx}: {correta}")
                                     
                                     # Cabeçalho da questão
                                     pdf.set_font(fn, "B", 10)
@@ -333,23 +361,29 @@ else:
                                     
                                     # Enunciado
                                     pdf.set_font(fn, "", 11)
-                                    enunciado_real = clean(r.get("Enunciado"))
-                                    if enunciado_real:
-                                        pdf.multi_cell(l_util, 6, enunciado_real)
+                                    pergunta = clean(r.get("Pergunta"))
+                                    if pergunta:
+                                        pdf.multi_cell(l_util, 6, pergunta)
                                     pdf.ln(4)
                                     
-                                    # Alternativas
+                                    # Alternativas (A, B, C, D, E)
                                     pdf.set_font(fn, "", 10)
-                                    for l in ["A", "B", "C", "D"]:
+                                    for l in ["A", "B", "C", "D", "E"]:
                                         texto_alt = clean(r.get(l))
                                         if texto_alt:
                                             pdf.set_x(pdf.l_margin + 8)
-                                            pdf.multi_cell(l_util - 8, 6, clean(f"({l}) {texto_alt}"))
+                                            # Destaca a alternativa correta
+                                            if l == correta:
+                                                pdf.set_font(fn, "B", 10)
+                                                pdf.multi_cell(l_util - 8, 6, clean(f"({l}) {texto_alt} ✓"))
+                                                pdf.set_font(fn, "", 10)
+                                            else:
+                                                pdf.multi_cell(l_util - 8, 6, clean(f"({l}) {texto_alt}"))
                                     
                                     pdf.ln(4)
                                     pdf.set_draw_color(200, 200, 200)
                                     pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.l_margin, pdf.get_y())
-                                    pdf.set_draw_color(0, 0, 0)  # ← CORRIGIDO: Corrigido formato
+                                    pdf.set_draw_color(0, 0, 0)
                                     pdf.ln(6)
 
                                 # Gabarito
@@ -381,7 +415,7 @@ else:
                 # Log de atividades (apenas para coordenação)
                 if st.session_state.log_atividades:
                     with st.expander("📋 Log de Atividades", expanded=False):
-                        for log in st.session_state.log_atividades[-10:]:  # Últimos 10 registros
+                        for log in st.session_state.log_atividades[-10:]:
                             st.text(log)
 
         except Exception as e:
