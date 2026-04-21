@@ -9,11 +9,12 @@ st.title("📚 Portal de Simulados")
 st.markdown("**Escola Estadual Padre Constantino de Monte**")
 st.divider()
 
-# 2. Conexão com a Planilha (Usando o que está no seu requirements)
+# 2. Conexão com a Planilha (Definindo 'conn' de forma global)
+conn = None
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
 except Exception as e:
-    st.error("Erro de conexão. Verifique o seu Secrets no Streamlit Cloud.")
+    st.error(f"Erro Crítico de Conexão: {e}. Verifique as chaves no Secrets.")
 
 # 3. Navegação Lateral
 with st.sidebar:
@@ -22,7 +23,7 @@ with st.sidebar:
     st.divider()
     st.info("SIDE - Maracaju/MS")
 
-# --- ÁREA DO PROFESSOR (Lançamento Direto na Planilha) ---
+# --- ÁREA DO PROFESSOR ---
 if perfil == "Professor (a)":
     st.subheader("👨‍🏫 Lançamento de Questões")
     
@@ -35,7 +36,7 @@ if perfil == "Professor (a)":
                 "Educação Física", "Leitura e Produção de texto"
             ])
         with col2:
-            habilidade = st.text_input("Habilidade MS:", placeholder="Ex: EF06LP01")
+            habilidade = st.text_input("Habilidade MS (Ex: EF06LP01):")
             
         enunciado = st.text_area("Enunciado da Questão:", height=150)
         
@@ -47,66 +48,62 @@ if perfil == "Professor (a)":
             alt_c = st.text_input("Alternativa C:")
             alt_d = st.text_input("Alternativa D:")
             
-        correta = st.selectbox("Gabarito:", ["A", "B", "C", "D"])
+        gabarito = st.selectbox("Gabarito:", ["A", "B", "C", "D"])
         
         btn_salvar = st.form_submit_button("🚀 CADASTRAR NO BANCO DE DADOS")
         
         if btn_salvar:
-            if enunciado and alt_a and habilidade:
+            if conn is None:
+                st.error("Não é possível salvar: Conexão com a planilha não estabelecida.")
+            elif not enunciado or not habilidade or not alt_a:
+                st.warning("Preencha o enunciado, a habilidade e as alternativas.")
+            else:
                 try:
-                    # Lê o que já existe
-                    df_antigo = conn.read(ttl=0)
+                    # Tenta ler os dados atuais
+                    df_existente = conn.read(ttl=0)
                     
-                    # Cria a nova linha
-                    nova_linha = pd.DataFrame([{
+                    # Nova linha
+                    nova_q = pd.DataFrame([{
                         "Disciplina": disciplina,
                         "Habilidade": habilidade,
                         "Enunciado": enunciado,
                         "A": alt_a, "B": alt_b, "C": alt_c, "D": alt_d,
-                        "Gabarito": correta
+                        "Gabarito": gabarito
                     }])
                     
-                    # Junta tudo e envia de volta
-                    df_atualizado = pd.concat([df_antigo, nova_linha], ignore_index=True)
-                    conn.update(data=df_atualizado)
-                    
-                    st.success("✅ Sucesso! Questão gravada na planilha.")
+                    # Atualiza a planilha
+                    df_final = pd.concat([df_existente, nova_q], ignore_index=True)
+                    conn.update(data=df_final)
+                    st.success("✅ Questão cadastrada com sucesso!")
                     st.balloons()
                 except Exception as e:
-                    st.error(f"Erro ao salvar: {e}")
-            else:
-                st.warning("Por favor, preencha o Enunciado e a Habilidade.")
+                    st.error(f"Erro ao gravar dados: {e}")
 
-# --- ÁREA DA COORDENAÇÃO (Filtros + Gerador de PDF) ---
+# --- ÁREA DA COORDENAÇÃO ---
 else:
     st.subheader("🔑 Área Restrita")
-    senha = st.text_input("Digite a senha da Coordenação:", type="password")
+    senha = st.text_input("Senha da Coordenação:", type="password")
     
     if senha == "coord2026":
-        st.success("Acesso Autorizado")
-        
-        try:
-            df = conn.read(ttl=0)
-            
-            st.write("### 🔍 Filtros para Prova")
-            lista_materias = df['Disciplina'].unique().tolist()
-            selecao = st.multiselect("Filtrar Disciplinas:", lista_materias)
-            
-            df_final = df[df['Disciplina'].isin(selecao)] if selecao else df
-            
-            st.dataframe(df_final, use_container_width=True)
-            
-            if not df_final.empty:
-                def gerar_pdf(dados):
+        if conn is not None:
+            try:
+                df = conn.read(ttl=0)
+                st.write("### 🔍 Banco de Questões")
+                
+                filtro = st.multiselect("Filtrar Disciplinas:", df['Disciplina'].unique())
+                df_filtro = df[df['Disciplina'].isin(filtro)] if filtro else df
+                
+                st.dataframe(df_filtro, use_container_width=True)
+                
+                if not df_filtro.empty:
+                    # Função PDF
                     pdf = FPDF()
                     pdf.add_page()
-                    pdf.set_font("Arial", "B", 16)
+                    pdf.set_font("Arial", "B", 14)
                     pdf.cell(0, 10, "Escola Estadual Padre Constantino de Monte", ln=True, align='C')
-                    pdf.set_font("Arial", "", 12)
-                    pdf.cell(0, 10, "Simulado Escolar - 2026", ln=True, align='C')
                     pdf.ln(10)
                     
-                    for i, r in dados.iterrows():
+                    for i, r in df_filtro.iterrows():
                         pdf.set_font("Arial", "B", 11)
                         pdf.multi_cell(0, 8, f"QUESTÃO {i+1} - {r['Disciplina']}")
                         pdf.set_font("Arial", "I", 9)
@@ -115,18 +112,12 @@ else:
                         pdf.multi_cell(0, 7, str(r['Enunciado']))
                         pdf.cell(0, 7, f"A) {r['A']}", ln=True)
                         pdf.cell(0, 7, f"B) {r['B']}", ln=True)
-                        pdf.cell(0, 7, f"C) {r['C']}", ln=True)
-                        pdf.cell(0, 7, f"D) {r['D']}", ln=True)
-                        pdf.ln(5)
-                    return pdf.output(dest='S').encode('latin-1')
-
-                st.download_button(
-                    "📄 BAIXAR PROVA EM PDF",
-                    data=gerar_pdf(df_final),
-                    file_name="simulado_constantino.pdf",
-                    mime="application/pdf"
-                )
-        except:
-            st.error("Erro ao carregar banco de dados.")
+                        pdf.ln(4)
+                    
+                    st.download_button("📄 BAIXAR PDF", pdf.output(dest='S').encode('latin-1'), "simulado.pdf")
+            except:
+                st.error("Erro ao ler a planilha.")
+        else:
+            st.error("Conexão indisponível.")
     elif senha != "":
-        st.error("Senha Incorreta.")
+        st.error("Senha incorreta.")
