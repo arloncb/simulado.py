@@ -63,9 +63,15 @@ LISTA_TURMAS = ["4° A", "5° A", "6° A", "6° B", "6° C", "7° A", "8° A", "
 LISTA_DISCS = ["Língua Portuguesa", "Matemática", "Arte", "Língua Inglesa", "Ciências", "História", "Geografia", "Ensino Religioso", "Educação Física", "Leitura e Produção de texto"]
 SENHA_COORD = "coord2026"
 
+# Inicialização do session_state
 _defaults = {"prof_nome": "", "prof_turma": "6° A", "prof_disc": "Língua Portuguesa", "q_hab": "", "q_enun": "", "q_a": "", "q_b": "", "q_c": "", "q_d": ""}
 for k, v in _defaults.items():
-    if k not in st.session_state: st.session_state[k] = v
+    if k not in st.session_state: 
+        st.session_state[k] = v
+
+# Inicializa log de atividades
+if "log_atividades" not in st.session_state:
+    st.session_state.log_atividades = []
 
 # ─── CONEXÃO ──────────────────────────────────────────────────────────────────
 conn = None
@@ -73,6 +79,17 @@ try:
     conn = st.connection("gsheets", type=GSheetsConnection)
 except Exception as e:
     st.error(f"Erro de conexão: {e}")
+
+# ─── FUNÇÃO PARA CARREGAR DADOS COM CACHE ─────────────────────────────────────
+@st.cache_data(ttl=30)
+def carregar_dados():
+    """Carrega os dados do Google Sheets com cache de 30 segundos"""
+    if conn:
+        try:
+            return conn.read(ttl=0)
+        except:
+            return None
+    return None
 
 # ─── SIDEBAR ──────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -91,7 +108,8 @@ if perfil == "👨‍🏫 Professor(a)":
     with st.form("form_simulado", clear_on_submit=False):
         st.markdown('<p class="section-label">👤 Identificação</p>', unsafe_allow_html=True)
         c1, c2, c3 = st.columns([2, 1, 2])
-        with c1: nome_professor = st.text_input("Nome do(a) Professor(a)*", value=st.session_state["prof_nome"])
+        with c1: 
+            nome_professor = st.text_input("Nome do(a) Professor(a)*", value=st.session_state["prof_nome"])
         with c2: 
             idx_t = LISTA_TURMAS.index(st.session_state["prof_turma"]) if st.session_state["prof_turma"] in LISTA_TURMAS else 0
             turma = st.selectbox("Turma*", LISTA_TURMAS, index=idx_t)
@@ -113,24 +131,85 @@ if perfil == "👨‍🏫 Professor(a)":
             alt_d = st.text_input("Alternativa D*", value=st.session_state["q_d"])
 
         gabarito = st.radio("✅ Gabarito*", ["A", "B", "C", "D"], horizontal=True)
+        
+        # Preview da questão
+        with st.expander("👁️ Pré-visualizar questão", expanded=False):
+            if enunciado:
+                st.markdown(f"**{enunciado}**")
+                st.markdown(f"A) {alt_a if alt_a else '...'}")
+                st.markdown(f"B) {alt_b if alt_b else '...'}")
+                st.markdown(f"C) {alt_c if alt_c else '...'}")
+                st.markdown(f"D) {alt_d if alt_d else '...'}")
+                st.markdown(f"✅ **Gabarito: {gabarito}**")
+            else:
+                st.info("Preencha o enunciado para pré-visualizar")
+        
         btn_salvar = st.form_submit_button("🚀 Cadastrar Questão")
 
         if btn_salvar:
+            # Validações
             if not nome_professor or not habilidade or not enunciado:
-                st.error("⚠️ Preencha os campos obrigatórios.")
+                st.error("⚠️ Preencha os campos obrigatórios (Nome, Habilidade e Enunciado).")
+            elif not all([alt_a, alt_b, alt_c, alt_d]):
+                st.error("⚠️ Todas as alternativas (A, B, C, D) são obrigatórias.")
             elif conn:
                 try:
-                    df_atual = conn.read(ttl=0)
+                    # Carrega dados atuais
+                    df_atual = carregar_dados()
+                    
+                    # Se não existir dados, cria DataFrame vazio
+                    if df_atual is None or df_atual.empty:
+                        df_atual = pd.DataFrame(columns=[
+                            "Professor(a)", "Turma", "Disciplina", "Habilidade", 
+                            "Enunciado", "A", "B", "C", "D", "Gabarito", "Data"
+                        ])
+                    
+                    # Cria nova linha
                     nova_linha = pd.DataFrame([{
-                        "Professor(a)": nome_professor, "Turma": turma, "Disciplina": disciplina,
-                        "Habilidade": habilidade, "Enunciado": enunciado, "A": alt_a, "B": alt_b,
-                        "C": alt_c, "D": alt_d, "Gabarito": gabarito, "Data": datetime.now().strftime("%d/%m/%Y %H:%M")
+                        "Professor(a)": nome_professor, 
+                        "Turma": turma, 
+                        "Disciplina": disciplina,
+                        "Habilidade": habilidade, 
+                        "Enunciado": enunciado, 
+                        "A": alt_a, 
+                        "B": alt_b,
+                        "C": alt_c, 
+                        "D": alt_d, 
+                        "Gabarito": gabarito, 
+                        "Data": datetime.now().strftime("%d/%m/%Y %H:%M")
                     }])
-                    conn.update(data=pd.concat([df_atual, nova_linha], ignore_index=True))
-                    st.session_state.update({"prof_nome": nome_professor, "q_hab": "", "q_enun": "", "q_a": "", "q_b": "", "q_c": "", "q_d": ""})
-                    st.success("✅ Questão salva!")
+                    
+                    # Concatena e salva
+                    df_final = pd.concat([df_atual, nova_linha], ignore_index=True)
+                    conn.update(data=df_final)
+                    
+                    # Atualiza session_state (incluindo a turma!)
+                    st.session_state.update({
+                        "prof_nome": nome_professor, 
+                        "prof_turma": turma,  # ← CORRIGIDO: Agora salva a turma
+                        "prof_disc": disciplina,
+                        "q_hab": "", 
+                        "q_enun": "", 
+                        "q_a": "", 
+                        "q_b": "", 
+                        "q_c": "", 
+                        "q_d": ""
+                    })
+                    
+                    # Registra no log
+                    st.session_state.log_atividades.append(
+                        f"{datetime.now().strftime('%d/%m/%Y %H:%M')} - Questão cadastrada por {nome_professor} ({disciplina} - {turma})"
+                    )
+                    
+                    # Limpa cache para forçar recarga
+                    st.cache_data.clear()
+                    
+                    st.success("✅ Questão salva com sucesso!")
+                    st.balloons()
                     st.rerun()
-                except Exception as e: st.error(f"Erro ao salvar: {e}")
+                    
+                except Exception as e: 
+                    st.error(f"Erro ao salvar: {e}")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ÁREA DA COORDENAÇÃO
@@ -141,91 +220,173 @@ else:
 
     if senha == SENHA_COORD:
         try:
-            df = conn.read(ttl=0)
-            if df.empty: st.info("Nenhuma questão cadastrada.")
+            # Carrega dados com cache
+            df = carregar_dados()
+            
+            if df is None or df.empty:
+                st.info("📭 Nenhuma questão cadastrada ainda.")
             else:
-                st.markdown('<p class="section-label">🔍 Filtros para Exportação</p>', unsafe_allow_html=True)
-                f1, f2, f3 = st.columns(3)
-                with f1: op_t = sorted([str(x) for x in df["Turma"].dropna().unique()]); f_turma = st.multiselect("Turma:", op_t)
-                with f2: op_d = sorted([str(x) for x in df["Disciplina"].dropna().unique()]); f_disc = st.multiselect("Disciplina:", op_d)
-                with f3: op_p = sorted([str(x) for x in df["Professor(a)"].dropna().unique()]); f_prof = st.multiselect("Professor(a):", op_p)
+                # Verifica se as colunas existem antes de usar
+                colunas_necessarias = ["Turma", "Disciplina", "Professor(a)"]
+                colunas_presentes = [col for col in colunas_necessarias if col in df.columns]
+                
+                if len(colunas_presentes) == len(colunas_necessarias):
+                    st.markdown('<p class="section-label">🔍 Filtros para Exportação</p>', unsafe_allow_html=True)
+                    f1, f2, f3 = st.columns(3)
+                    
+                    with f1:
+                        op_t = sorted([str(x) for x in df["Turma"].dropna().unique()]) if "Turma" in df.columns else []
+                        f_turma = st.multiselect("Turma:", op_t)
+                    
+                    with f2:
+                        op_d = sorted([str(x) for x in df["Disciplina"].dropna().unique()]) if "Disciplina" in df.columns else []
+                        f_disc = st.multiselect("Disciplina:", op_d)
+                    
+                    with f3:
+                        op_p = sorted([str(x) for x in df["Professor(a)"].dropna().unique()]) if "Professor(a)" in df.columns else []
+                        f_prof = st.multiselect("Professor(a):", op_p)
 
-                df_v = df.copy()
-                if f_turma: df_v = df_v[df_v["Turma"].isin(f_turma)]
-                if f_disc: df_v = df_v[df_v["Disciplina"].isin(f_disc)]
-                if f_prof: df_v = df_v[df_v["Professor(a)"].isin(f_prof)]
+                    # Aplica filtros
+                    df_v = df.copy()
+                    if f_turma: 
+                        df_v = df_v[df_v["Turma"].isin(f_turma)]
+                    if f_disc: 
+                        df_v = df_v[df_v["Disciplina"].isin(f_disc)]
+                    if f_prof: 
+                        df_v = df_v[df_v["Professor(a)"].isin(f_prof)]
+                else:
+                    df_v = df.copy()
+                    st.warning("⚠️ Algumas colunas esperadas não foram encontradas. Exibindo todos os dados sem filtros.")
 
+                # Métricas
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("📊 Total de Questões", len(df_v))
+                with col2:
+                    if "Turma" in df_v.columns:
+                        st.metric("🏫 Turmas", df_v["Turma"].nunique())
+                with col3:
+                    if "Disciplina" in df_v.columns:
+                        st.metric("📚 Disciplinas", df_v["Disciplina"].nunique())
+
+                st.divider()
                 st.dataframe(df_v, use_container_width=True, hide_index=True)
 
+                # Exportação
                 exp1, exp2 = st.columns(2)
                 with exp1:
                     csv = df_v.to_csv(index=False).encode("utf-8-sig")
-                    st.download_button("⬇️ Baixar CSV (Excel)", data=csv, file_name="simulado.csv", use_container_width=True)
+                    st.download_button(
+                        "⬇️ Baixar CSV (Excel)", 
+                        data=csv, 
+                        file_name=f"simulado_{datetime.now().strftime('%Y%m%d_%H%M')}.csv", 
+                        use_container_width=True
+                    )
                 
                 with exp2:
                     if st.button("📄 Gerar e Baixar Banco de Questões PDF", use_container_width=True):
-                        garantir_fontes()
-                        pdf = FPDF()
-                        pdf.set_auto_page_break(auto=True, margin=20)
-                        
-                        usar_unicode = False
-                        if os.path.exists("DejaVuSans.ttf"):
-                            pdf.add_font("SideFont", "", "DejaVuSans.ttf", uni=True)
-                            pdf.add_font("SideFont", "B", "DejaVuSans-Bold.ttf", uni=True)
-                            fn, usar_unicode = "SideFont", True
-                        else: fn = "Helvetica"
+                        if df_v.empty:
+                            st.warning("⚠️ Não há questões para gerar o PDF.")
+                        else:
+                            with st.spinner("Gerando PDF..."):
+                                garantir_fontes()
+                                pdf = FPDF()
+                                pdf.set_auto_page_break(auto=True, margin=20)
+                                
+                                usar_unicode = False
+                                if os.path.exists("DejaVuSans.ttf"):
+                                    pdf.add_font("SideFont", "", "DejaVuSans.ttf", uni=True)
+                                    pdf.add_font("SideFont", "B", "DejaVuSans-Bold.ttf", uni=True)
+                                    fn, usar_unicode = "SideFont", True
+                                else:
+                                    fn = "Helvetica"
 
-                        def clean(val):
-                            if pd.isna(val) or val is None: return ""
-                            t = str(val).strip()
-                            return t if usar_unicode else t.encode('latin-1', 'replace').decode('latin-1')
+                                def clean(val):
+                                    if pd.isna(val) or val is None: 
+                                        return ""
+                                    t = str(val).strip()
+                                    return t if usar_unicode else t.encode('latin-1', 'replace').decode('latin-1')
 
-                        pdf.add_page()
-                        l_util = pdf.w - 2 * pdf.l_margin
+                                # Página de rosto
+                                pdf.add_page()
+                                pdf.set_font(fn, "B", 16)
+                                pdf.cell(0, 10, clean("SIDE - Sistema Integrado de Desempenho Escolar"), ln=True, align="C")
+                                pdf.ln(5)
+                                pdf.set_font(fn, "", 12)
+                                pdf.cell(0, 8, clean("Banco de Questões para Simulados"), ln=True, align="C")
+                                pdf.cell(0, 8, clean(f"Gerado em: {datetime.now().strftime('%d/%m/%Y às %H:%M')}"), ln=True, align="C")
+                                pdf.cell(0, 8, clean(f"Total de questões: {len(df_v)}"), ln=True, align="C")
+                                
+                                l_util = pdf.w - 2 * pdf.l_margin
+                                gabs = []
+                                
+                                # Questões
+                                for idx, (_, r) in enumerate(df_v.iterrows(), 1):
+                                    pdf.add_page()
+                                    gabs.append(f"Q{idx}: {r.get('Gabarito', 'N/A')}")
+                                    
+                                    # Cabeçalho da questão
+                                    pdf.set_font(fn, "B", 10)
+                                    header_txt = f"QUESTÃO {idx:02d} | {r.get('Disciplina', 'N/A')} | ({r.get('Habilidade', 'N/A')}) | Turma: {r.get('Turma', 'N/A')}"
+                                    pdf.multi_cell(l_util, 6, clean(header_txt))
+                                    pdf.ln(2)
+                                    
+                                    # Enunciado
+                                    pdf.set_font(fn, "", 11)
+                                    enunciado_real = clean(r.get("Enunciado"))
+                                    if enunciado_real:
+                                        pdf.multi_cell(l_util, 6, enunciado_real)
+                                    pdf.ln(4)
+                                    
+                                    # Alternativas
+                                    pdf.set_font(fn, "", 10)
+                                    for l in ["A", "B", "C", "D"]:
+                                        texto_alt = clean(r.get(l))
+                                        if texto_alt:
+                                            pdf.set_x(pdf.l_margin + 8)
+                                            pdf.multi_cell(l_util - 8, 6, clean(f"({l}) {texto_alt}"))
+                                    
+                                    pdf.ln(4)
+                                    pdf.set_draw_color(200, 200, 200)
+                                    pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.l_margin, pdf.get_y())
+                                    pdf.set_draw_color(0, 0, 0)  # ← CORRIGIDO: Corrigido formato
+                                    pdf.ln(6)
 
-                        gabs = []
-                        for idx, (_, r) in enumerate(df_v.iterrows(), 1):
-                            gabs.append(f"Q{idx}: {r.get('Gabarito')}")
-                            
-                            # Identificação Técnica da Questão
-                            pdf.set_font(fn, "B", 10)
-                            header_txt = f"QUESTÃO {idx:02d} | {r.get('Disciplina')} | ({r.get('Habilidade')})"
-                            pdf.multi_cell(l_util, 6, clean(header_txt))
-                            pdf.ln(1)
-                            
-                            # Enunciado Real (Substituindo o placeholder)
-                            pdf.set_font(fn, "", 10)
-                            enunciado_real = clean(r.get("Enunciado"))
-                            if enunciado_real:
-                                pdf.multi_cell(l_util, 5, enunciado_real)
-                            pdf.ln(3)
-                            
-                            # Alternativas com Recuo
-                            for l in ["A", "B", "C", "D"]:
-                                texto_alt = clean(r.get(l))
-                                if texto_alt:
-                                    pdf.set_x(pdf.l_margin + 8)
-                                    pdf.multi_cell(l_util - 8, 6, clean(f"({l}) {texto_alt}"))
-                            
-                            pdf.ln(4)
-                            pdf.set_draw_color(200, 200, 200)
-                            pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.l_margin, pdf.get_y())
-                            pdf.ln(6)
-                            pdf.set_draw_color(0, 0, 0)
+                                # Gabarito
+                                pdf.add_page()
+                                pdf.set_font(fn, "B", 14)
+                                pdf.cell(l_util, 10, clean("GABARITO DE REFERÊNCIA"), ln=True, align="C")
+                                pdf.ln(8)
+                                pdf.set_font(fn, "", 11)
+                                for i in range(0, len(gabs), 3):
+                                    pdf.cell(60, 8, clean(gabs[i]))
+                                    if i+1 < len(gabs): 
+                                        pdf.cell(60, 8, clean(gabs[i+1]))
+                                    if i+2 < len(gabs): 
+                                        pdf.cell(60, 8, clean(gabs[i+2]))
+                                    pdf.ln()
+                                
+                                # Botão de download do PDF
+                                pdf_bytes = bytes(pdf.output())
+                                st.download_button(
+                                    "⬇️ Baixar Banco de Questões (PDF)", 
+                                    data=pdf_bytes, 
+                                    file_name=f"banco_questoes_side_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                                    use_container_width=True,
+                                    key="download_pdf"
+                                )
+                                
+                                st.success("✅ PDF gerado com sucesso!")
 
-                        # Gabarito ao Final
-                        pdf.add_page()
-                        pdf.set_font(fn, "B", 14)
-                        pdf.cell(l_util, 10, clean("GABARITO DE REFERÊNCIA"), ln=True, align="C")
-                        pdf.ln(5)
-                        pdf.set_font(fn, "", 11)
-                        for i in range(0, len(gabs), 3):
-                            pdf.cell(60, 8, clean(gabs[i]))
-                            if i+1 < len(gabs): pdf.cell(60, 8, clean(gabs[i+1]))
-                            if i+2 < len(gabs): pdf.cell(60, 8, clean(gabs[i+2]))
-                            pdf.ln()
+                # Log de atividades (apenas para coordenação)
+                if st.session_state.log_atividades:
+                    with st.expander("📋 Log de Atividades", expanded=False):
+                        for log in st.session_state.log_atividades[-10:]:  # Últimos 10 registros
+                            st.text(log)
 
-                        st.download_button("⬇️ Baixar Banco de Questões (PDF)", data=bytes(pdf.output()), file_name="banco_questoes_side.pdf", use_container_width=True)
-
-        except Exception as e: st.error(f"Erro ao processar: {e}")
-    elif senha: st.error("Senha incorreta.")
+        except Exception as e:
+            st.error(f"Erro ao processar os dados: {e}")
+            st.info("Verifique se a planilha do Google Sheets está configurada corretamente.")
+            
+    elif senha:
+        st.error("❌ Senha incorreta. Tente novamente.")
