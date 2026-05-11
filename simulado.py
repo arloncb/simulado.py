@@ -112,9 +112,9 @@ if perfil == "👨‍🏫 Professor(a)":
         
         ca, cb = st.columns(2)
         with ca:
-            a, b, c = st.text_input("Alt A*"), st.text_input("Alt B*"), st.text_input("Alt C*")
+            a, b, c = st.text_input("A*"), st.text_input("B*"), st.text_input("C*")
         with cb:
-            d, e = st.text_input("Alt D*"), st.text_input("Alt E*")
+            d, e = st.text_input("D*"), st.text_input("E*")
         
         gab = st.radio("✅ Correta*", ["A", "B", "C", "D", "E"], horizontal=True)
         btn = st.form_submit_button("🚀 Cadastrar Questão")
