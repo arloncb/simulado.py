@@ -1,7 +1,6 @@
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
-from fpdf import FPDF
 from docx import Document
 from docx.shared import Inches
 from io import BytesIO
@@ -18,7 +17,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ─── TRATAMENTO DE TEXTO (EVITAR O ? E ERROS DE CODIFICAÇÃO) ────────────────
+# ─── TRATAMENTO DE TEXTO (EVITAR CARACTERES ESPECIAIS) ──────────────────────
 def limpar_texto(texto):
     if pd.isna(texto) or texto is None:
         return ""
@@ -31,10 +30,9 @@ def limpar_texto(texto):
     }
     for original, novo in substituicoes.items():
         t = t.replace(original, novo)
-    # Codifica para latin-1 e decodifica para garantir compatibilidade com PDF/Docx
-    return t.encode('latin-1', 'replace').decode('latin-1')
+    return t
 
-# ─── FUNÇÃO PARA GERAR DOCX (PADRÃO SOLICITADO) ──────────────────────────────
+# ─── FUNÇÃO PARA GERAR DOCX (NOVO PADRÃO SIDE) ──────────────────────────────
 def gerar_docx_questoes(df_export):
     doc = Document()
     
@@ -45,11 +43,14 @@ def gerar_docx_questoes(df_export):
         # 2. Habilidade
         doc.add_paragraph(f"Habilidade: {r.get('Habilidade')}")
         
-        # 3. Enunciado
-        p_enun = doc.add_paragraph()
-        p_enun.add_run(limpar_texto(r.get("Pergunta")))
+        # 3. Número da questão (Dinâmico)
+        p_num = doc.add_paragraph()
+        p_num.add_run(f"QUESTÃO {idx:02d}").bold = True
         
-        # 4. Imagem (se houver)
+        # 4. Enunciado da questão
+        doc.add_paragraph(limpar_texto(r.get("Pergunta")))
+        
+        # 5. Imagem (se houver)
         link_img = r.get("Link Imagem")
         if pd.notna(link_img) and str(link_img).strip().lower() not in ["", "nan"]:
             try:
@@ -60,13 +61,14 @@ def gerar_docx_questoes(df_export):
             except:
                 pass 
         
-        # 5. Alternativas (uma abaixo da outra)
+        # 6. Alternativas uma sobre a outra
         for letra in ["A", "B", "C", "D", "E"]:
             conteudo = r.get(letra)
             if pd.notna(conteudo):
                 doc.add_paragraph(f"({letra}) {limpar_texto(conteudo)}")
         
-        # Espaçamento simples entre questões
+        # Linha separadora entre questões
+        doc.add_paragraph("-" * 30)
         doc.add_paragraph("\n")
     
     buffer = BytesIO()
@@ -88,7 +90,7 @@ def carregar_dados():
     except:
         return None
 
-# ─── INTERFACE ────────────────────────────────────────────────────────────────
+# ─── INTERFACE VISUAL ─────────────────────────────────────────────────────────
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
@@ -148,7 +150,6 @@ if perfil == "👨‍🏫 Professor(a)":
                         "Habilidade": hab_p, "Pergunta": enun_p, "A": a, "B": b, "C": c, "D": d, "E": e,
                         "Correta": gab_p, "Link Imagem": link_p
                     }])
-                    # LINHA CORRIGIDA (Parênteses fechados corretamente)
                     conn.update(data=pd.concat([df_atual, nova_q], ignore_index=True))
                     st.balloons()
                     st.toast("Sucesso!", icon='✅')
@@ -156,7 +157,10 @@ if perfil == "👨‍🏫 Professor(a)":
 
     if enun_p:
         st.divider()
-        temp_df = pd.DataFrame([{"Disciplina": disc_p, "Habilidade": hab_p, "Pergunta": enun_p, "A": a, "B": b, "C": c, "D": d, "E": e, "Link Imagem": link_p}])
+        temp_df = pd.DataFrame([{
+            "Disciplina": disc_p, "Habilidade": hab_p, "Pergunta": enun_p, 
+            "A": a, "B": b, "C": c, "D": d, "E": e, "Link Imagem": link_p
+        }])
         doc_prof = gerar_docx_questoes(temp_df)
         st.download_button("⬇️ Baixar esta Questão em Word", doc_prof, "Minha_Questao.docx", use_container_width=True)
 
@@ -170,6 +174,7 @@ else:
     if senha == SENHA_COORD:
         df = carregar_dados()
         if df is not None and not df.empty:
+            st.markdown("### 🔍 Filtros Seletores")
             f1, f2, f3 = st.columns(3)
             with f1: t_f = st.multiselect("Filtrar Turmas:", sorted(df["Turma"].unique()))
             with f2: d_f = st.multiselect("Filtrar Disciplinas:", sorted(df["Disciplina"].unique()))
@@ -180,43 +185,19 @@ else:
             if d_f: df_v = df_v[df_v["Disciplina"].isin(d_f)]
             if p_f: df_v = df_v[df_v["Professor (a)"].isin(p_f)]
             
-            st.metric("Total de Questões Selecionadas", len(df_v))
+            st.metric("Questões Selecionadas", len(df_v))
             st.dataframe(df_v, use_container_width=True, hide_index=True)
             
             st.divider()
-            c_exp1, c_exp2 = st.columns(2)
             
-            with c_exp1:
-                if st.button("📄 Gerar Banco em PDF", use_container_width=True):
-                    try:
-                        pdf = FPDF()
-                        pdf.set_auto_page_break(auto=True, margin=20)
-                        pdf.add_page()
-                        w_u = pdf.w - 2 * pdf.l_margin
-                        
-                        pdf.set_font("Arial", "B", 14)
-                        pdf.cell(w_u, 10, "BANCO DE QUESTÕES - SIDE", ln=True, align="C")
-                        pdf.ln(5)
-                        
-                        for i, (_, r) in enumerate(df_v.iterrows(), 1):
-                            pdf.set_font("Arial", "B", 11)
-                            pdf.multi_cell(w_u, 6, limpar_texto(f"QUESTÃO {i:02d} - {r['Turma']} ({r['Disciplina']})"))
-                            pdf.set_font("Arial", "", 11)
-                            pdf.multi_cell(w_u, 6, limpar_texto(r.get('Pergunta')))
-                            pdf.ln(2)
-                            for l in ["A", "B", "C", "D", "E"]:
-                                pdf.multi_cell(w_u, 6, limpar_texto(f"({l}) {r.get(l)}"))
-                            pdf.ln(4)
-                            pdf.set_draw_color(220, 220, 220)
-                            pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.l_margin, pdf.get_y())
-                            pdf.ln(4)
-                        
-                        # Fix: pdf.output() no fpdf2 já retorna bytes/bytearray diretamente
-                        st.download_button("⬇️ Baixar PDF", pdf.output(), "Banco_SIDE.pdf", mime="application/pdf", use_container_width=True)
-                    except Exception as e:
-                        st.error(f"Erro ao processar PDF: {e}")
-
-            with c_exp2:
-                with st.spinner("Gerando arquivo Word..."):
+            if not df_v.empty:
+                with st.spinner("Preparando arquivo Word..."):
                     doc_banco = gerar_docx_questoes(df_v)
-                    st.download_button("⬇️ Baixar Banco Word (Padrão SIDE)", doc_banco, "Banco_SIDE_Padrao.docx", use_container_width=True)
+                    st.download_button(
+                        label="⬇️ Baixar Banco Selecionado em Word (Docx)", 
+                        data=doc_banco, 
+                        file_name=f"Banco_SIDE_{datetime.now().strftime('%d_%m')}.docx", 
+                        use_container_width=True
+                    )
+            else:
+                st.warning("Nenhuma questão encontrada com os filtros selecionados.")
