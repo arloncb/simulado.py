@@ -32,7 +32,7 @@ def limpar_texto(texto):
         t = t.replace(original, novo)
     return t
 
-# ─── FUNÇÃO PARA GERAR DOCX (NOVO PADRÃO SIDE) ──────────────────────────────
+# ─── FUNÇÃO PARA GERAR DOCX (PADRÃO SIDE) ──────────────────────────────────
 def gerar_docx_questoes(df_export):
     doc = Document()
     
@@ -78,7 +78,14 @@ def gerar_docx_questoes(df_export):
 
 # ─── CONSTANTES E CONEXÃO ─────────────────────────────────────────────────────
 LISTA_TURMAS = ["4° A", "5° A", "6° A", "6° B", "6° C", "7° A", "8° A", "9° A", "9° B", "9° C", "9° D", "1° A", "1° B", "2° A", "3° A"]
-LISTA_DISCS = ["Arte", "Ciências", "Educação Física", "Geografia", "História", "Língua Inglesa", "Língua Portuguesa", "Leitura e Produção de texto", "Matemática"]
+
+# LISTA DE DISCIPLINAS ATUALIZADA
+LISTA_DISCS = [
+    "Arte", "Biologia", "Ciências", "Educação Física", "Filosofia", 
+    "Física", "Geografia", "História", "Língua Inglesa", 
+    "Língua Portuguesa", "Matemática", "Química", "Sociologia"
+]
+
 SENHA_COORD = "coord2026"
 
 conn = st.connection("gsheets", type=GSheetsConnection)
@@ -130,9 +137,9 @@ if perfil == "👨‍🏫 Professor(a)":
         
         ca, cb = st.columns(2)
         with ca:
-            a, b, c = st.text_input("letra A*"), st.text_input("letra B*"), st.text_input("letra C*")
+            a, b, c = st.text_input("Alt A*"), st.text_input("Alt B*"), st.text_input("Alt C*")
         with cb:
-            d, e = st.text_input("letra D*"), st.text_input("letra E*")
+            d, e = st.text_input("Alt D*"), st.text_input("Alt E*")
         
         gab_p = st.radio("✅ Alternativa Correta*", ["A", "B", "C", "D", "E"], horizontal=True)
         btn_enviar = st.form_submit_button("🚀 Enviar Questão")
