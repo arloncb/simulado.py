@@ -46,7 +46,7 @@ def gerar_docx_banco(df_filtrado):
         
         # Enunciado
         p = doc.add_paragraph()
-        p.add_run(limpar_texto(r.get("Pergunta"))).bold = True
+        p.add_run(limpar_texto(r.get("Pergunta Contextualizada"))).bold = True
         
         # Lógica da Imagem (Insere a imagem real e remove o 'nan')
         link_img = r.get("Link Imagem")
