@@ -18,12 +18,11 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ─── FUNÇÃO DE TRATAMENTO DE TEXTO (CORREÇÃO DE CARACTERES) ──────────────────
+# ─── FUNÇÃO DE TRATAMENTO DE TEXTO (CORREÇÃO DEFINITIVA) ─────────────────────
 def limpar_texto(texto):
     if pd.isna(texto) or texto is None:
         return ""
     t = str(texto).strip()
-    # Substitui caracteres Unicode problemáticos por equivalentes ASCII
     substituicoes = {
         '“': '"', '”': '"', '‘': "'", '’': "'",
         '–': '-', '—': '-', '…': '...',
@@ -32,26 +31,23 @@ def limpar_texto(texto):
     }
     for original, novo in substituicoes.items():
         t = t.replace(original, novo)
-    
-    # Converte para latin-1 ignorando o que não for compatível para evitar o "?"
     return t.encode('latin-1', 'replace').decode('latin-1')
 
-# ─── FUNÇÃO DE EXPORTAÇÃO DOCX (COM IMAGENS) ─────────────────────────────────
-def gerar_docx_questoes(df_export, titulo="Banco de Questões"):
+# ─── FUNÇÃO PARA GERAR DOCX (NOVO PADRÃO SOLICITADO) ─────────────────────────
+def gerar_docx_questoes(df_export, titulo="Simulado"):
     doc = Document()
-    doc.add_heading(f'SIDE — {titulo}', 0)
-    doc.add_paragraph(f"Escola Estadual Padre Constantino de Monte")
-    doc.add_paragraph(f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
     
     for idx, (_, r) in enumerate(df_export.iterrows(), 1):
-        doc.add_heading(f"QUESTÃO {idx:02d}", level=1)
-        doc.add_paragraph(f"Disciplina: {r.get('Disciplina')} | Turma: {r.get('Turma')}")
+        # 1. Disciplina
+        doc.add_paragraph(f"Disciplina: {r.get('Disciplina')}")
         
-        # Pergunta
-        p = doc.add_paragraph()
-        p.add_run(limpar_texto(r.get("Pergunta"))).bold = True
+        # 2. Habilidade
+        doc.add_paragraph(f"Habilidade: {r.get('Habilidade')}")
         
-        # Inserção de Imagem Real
+        # 3. Enunciado
+        doc.add_paragraph(limpar_texto(r.get("Pergunta")))
+        
+        # 4. Imagem (se houver)
         link_img = r.get("Link Imagem")
         if pd.notna(link_img) and str(link_img).strip().lower() not in ["", "nan"]:
             try:
@@ -61,24 +57,26 @@ def gerar_docx_questoes(df_export, titulo="Banco de Questões"):
                     doc.add_picture(img_io, width=Inches(4.0))
             except:
                 pass 
-            
-        for letra in ["A", "B", "C", "D", "E"]:
-            doc.add_paragraph(f"({letra}) {limpar_texto(r.get(letra))}")
         
-        doc.add_paragraph(f"Gabarito: {r.get('Correta')}")
-        doc.add_paragraph("-" * 25)
+        # 5. Alternativas (uma abaixo da outra)
+        for letra in ["A", "B", "C", "D", "E"]:
+            alt_conteudo = r.get(letra)
+            if pd.notna(alt_conteudo):
+                doc.add_paragraph(f"({letra}) {limpar_texto(alt_conteudo)}")
+        
+        # Espaço entre as questões
+        doc.add_paragraph("\n")
     
     buffer = BytesIO()
     doc.save(buffer)
     buffer.seek(0)
     return buffer
 
-# ─── CONSTANTES ───────────────────────────────────────────────────────────────
+# ─── CONSTANTES E CONEXÃO ─────────────────────────────────────────────────────
 LISTA_TURMAS = ["4° A", "5° A", "6° A", "6° B", "6° C", "7° A", "8° A", "9° A", "9° B", "9° C", "9° D", "1° A", "1° B", "2° A", "3° A"]
 LISTA_DISCS = ["Arte", "Ciências", "Educação Física", "Geografia", "História", "Língua Inglesa", "Língua Portuguesa", "Leitura e Produção de texto", "Matemática"]
 SENHA_COORD = "coord2026"
 
-# ─── CONEXÃO ──────────────────────────────────────────────────────────────────
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 @st.cache_data(ttl=10)
@@ -86,7 +84,7 @@ def carregar_dados():
     try: return conn.read(ttl=0)
     except: return None
 
-# ─── INTERFACE VISUAL ─────────────────────────────────────────────────────────
+# ─── INTERFACE ────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
@@ -104,7 +102,7 @@ st.markdown("""
 
 with st.sidebar:
     st.markdown("## 📚 SIDE")
-    perfil = st.radio("Acesso:", ["👨‍🏫 Professor(a)", "🔑 Coordenação"])
+    perfil = st.radio("Selecione o Acesso:", ["👨‍🏫 Professor(a)", "🔑 Coordenação"])
     st.divider()
     st.caption(f"📅 {datetime.now().strftime('%d/%m/%Y')}")
 
@@ -137,7 +135,7 @@ if perfil == "👨‍🏫 Professor(a)":
             if not all([nome_p, hab_p, enun_p, a, b, c, d, e]):
                 st.error("⚠️ Por favor, preencha todos os campos.")
             else:
-                with st.spinner("🚀 Salvando no banco de dados..."):
+                with st.spinner("🚀 Salvando..."):
                     time.sleep(1.2)
                     df_atual = carregar_dados()
                     nova_q = pd.DataFrame([{
@@ -146,74 +144,4 @@ if perfil == "👨‍🏫 Professor(a)":
                         "Habilidade": hab_p, "Pergunta": enun_p, "A": a, "B": b, "C": c, "D": d, "E": e,
                         "Correta": gab_p, "Link Imagem": link_p
                     }])
-                    conn.update(data=pd.concat([df_atual, nova_q], ignore_index=True))
-                    st.balloons()
-                    st.toast("Sucesso!", icon='✅')
-                    st.success("✨ Questão registrada!")
-
-    if enun_p:
-        st.divider()
-        temp_df = pd.DataFrame([{"Professor (a)": nome_p, "Disciplina": disc_p, "Turma": turma_p, "Pergunta": enun_p, "A": a, "B": b, "C": c, "D": d, "E": e, "Correta": gab_p, "Link Imagem": link_p}])
-        doc_single = gerar_docx_questoes(temp_df, "Cópia de Questão")
-        st.download_button("⬇️ Baixar esta Questão em Word", doc_single, "Questao_Individual.docx", use_container_width=True)
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# PERFIL COORDENAÇÃO
-# ═══════════════════════════════════════════════════════════════════════════════
-else:
-    st.subheader("Portal da Coordenação")
-    senha = st.text_input("Chave de Acesso:", type="password")
-    
-    if senha == SENHA_COORD:
-        df = carregar_dados()
-        if df is not None and not df.empty:
-            f1, f2, f3 = st.columns(3)
-            with f1: t_f = st.multiselect("Filtrar Turmas:", sorted(df["Turma"].unique()))
-            with f2: d_f = st.multiselect("Filtrar Disciplinas:", sorted(df["Disciplina"].unique()))
-            with f3: p_f = st.multiselect("Filtrar Professor(a):", sorted(df["Professor (a)"].unique()))
-            
-            df_v = df.copy()
-            if t_f: df_v = df_v[df_v["Turma"].isin(t_f)]
-            if d_f: df_v = df_v[df_v["Disciplina"].isin(d_f)]
-            if p_f: df_v = df_v[df_v["Professor (a)"].isin(p_f)]
-            
-            st.metric("Questões Filtradas", len(df_v))
-            st.dataframe(df_v, use_container_width=True, hide_index=True)
-            
-            st.divider()
-            c_exp1, c_exp2 = st.columns(2)
-            
-            with c_exp1:
-                if st.button("📄 Gerar Banco em PDF", use_container_width=True):
-                    try:
-                        pdf = FPDF()
-                        pdf.set_auto_page_break(auto=True, margin=20)
-                        pdf.add_page()
-                        w_u = pdf.w - 2 * pdf.l_margin
-                        
-                        pdf.set_font("Arial", "B", 14)
-                        pdf.cell(w_u, 10, "BANCO DE QUESTÕES - SIDE", ln=True, align="C")
-                        pdf.ln(5)
-                        
-                        for i, (_, r) in enumerate(df_v.iterrows(), 1):
-                            pdf.set_font("Arial", "B", 11)
-                            pdf.multi_cell(w_u, 6, limpar_texto(f"QUESTÃO {i:02d} - {r['Turma']} ({r['Disciplina']})"))
-                            pdf.set_font("Arial", "", 11)
-                            pdf.multi_cell(w_u, 6, limpar_texto(r.get('Pergunta')))
-                            pdf.ln(2)
-                            for l in ["A", "B", "C", "D", "E"]:
-                                pdf.multi_cell(w_u, 6, limpar_texto(f"({l}) {r.get(l)}"))
-                            pdf.ln(4)
-                            pdf.set_draw_color(220, 220, 220)
-                            pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.l_margin, pdf.get_y())
-                            pdf.ln(4)
-                        
-                        # O segredo do erro está aqui: pdf.output() já é bytes, não precisa de .encode()
-                        st.download_button("⬇️ Baixar PDF", pdf.output(), "Banco_SIDE.pdf", mime="application/pdf", use_container_width=True)
-                    except Exception as e:
-                        st.error(f"Erro ao processar PDF: {e}")
-
-            with c_exp2:
-                with st.spinner("Gerando arquivo Word com imagens..."):
-                    doc_banco = gerar_docx_questoes(df_v, "Banco Completo")
-                    st.download_button("⬇️ Baixar Banco Word", doc_banco, "Banco_SIDE.docx", use_container_width=True)
+                    conn.update(data=
