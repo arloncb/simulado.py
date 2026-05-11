@@ -2,7 +2,7 @@ import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from fpdf import FPDF
-from docx import Document # Nova importação
+from docx import Document
 from io import BytesIO
 from datetime import datetime
 import os
@@ -17,7 +17,23 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ─── FUNÇÃO PARA GERAR DOCX ──────────────────────────────────────────────────
+# ─── FUNÇÃO DE TRATAMENTO DE TEXTO (CORREÇÃO DO ?) ───────────────────────────
+def limpar_texto_pdf(texto):
+    """Substitui caracteres especiais que quebram o PDF por caracteres padrão."""
+    if pd.isna(texto) or texto is None:
+        return ""
+    t = str(texto).strip()
+    # Substitui aspas inteligentes e traços longos que geram o "?"
+    substituicoes = {
+        '“': '"', '”': '"', '‘': "'", '’': "'",
+        '–': '-', '—': '-', '…': '...',
+        '\u2013': '-', '\u2014': '-', '\u201c': '"', '\u201d': '"'
+    }
+    for original, novo in substituicoes.items():
+        t = t.replace(original, novo)
+    return t
+
+# ─── FUNÇÃO PARA GERAR DOCX (PROFESSOR) ──────────────────────────────────────
 def gerar_docx(dados):
     doc = Document()
     doc.add_heading('SIDE — Portal de Simulados', 0)
@@ -27,10 +43,10 @@ def gerar_docx(dados):
     doc.add_paragraph("-" * 30)
     
     doc.add_heading(f"Habilidade: {dados['q_hab']}", level=2)
-    doc.add_paragraph(dados['q_enun'])
+    doc.add_paragraph(limpar_texto_pdf(dados['q_enun']))
     
     for letra in ['A', 'B', 'C', 'D', 'E']:
-        doc.add_paragraph(f"({letra}) {dados['q_' + letra.lower()]}")
+        doc.add_paragraph(f"({letra}) {limpar_texto_pdf(dados['q_' + letra.lower()])}")
     
     doc.add_paragraph(f"\nGabarito: {dados['gabarito']}")
     
@@ -38,19 +54,6 @@ def gerar_docx(dados):
     doc.save(buffer)
     buffer.seek(0)
     return buffer
-
-# ─── FUNÇÃO DE AUTO-CURA (FONTES) ─────────────────────────────────────────────
-def garantir_fontes():
-    fontes = {
-        "DejaVuSans.ttf": "https://github.com/reingart/pyfpdf/raw/master/font/dejavu/DejaVuSans.ttf",
-        "DejaVuSans-Bold.ttf": "https://github.com/reingart/pyfpdf/raw/master/font/dejavu/DejaVuSans-Bold.ttf"
-    }
-    for nome, url in fontes.items():
-        if not os.path.exists(nome):
-            try:
-                urllib.request.urlretrieve(url, nome)
-            except:
-                pass 
 
 # ─── CSS CUSTOMIZADO ──────────────────────────────────────────────────────────
 st.markdown("""
@@ -79,34 +82,22 @@ LISTA_DISCS = ["Língua Portuguesa", "Matemática", "Arte", "Língua Inglesa", "
 SENHA_COORD = "coord2026"
 
 # Inicialização do session_state
-_defaults = {"prof_nome": "", "prof_turma": "6° A", "prof_disc": "Língua Portuguesa", "q_hab": "", "q_enun": "", "q_a": "", "q_b": "", "q_c": "", "q_d": "", "q_e": "", "q_imagem": ""}
-for k, v in _defaults.items():
-    if k not in st.session_state: 
-        st.session_state[k] = v
-
-if "log_atividades" not in st.session_state:
-    st.session_state.log_atividades = []
+if "log_atividades" not in st.session_state: st.session_state.log_atividades = []
 
 # ─── CONEXÃO ──────────────────────────────────────────────────────────────────
-conn = None
-try:
-    conn = st.connection("gsheets", type=GSheetsConnection)
-except Exception as e:
-    st.error(f"Erro de conexão: {e}")
+conn = st.connection("gsheets", type=GSheetsConnection)
 
 @st.cache_data(ttl=30)
 def carregar_dados():
-    if conn:
-        try: return conn.read(ttl=0)
-        except: return None
-    return None
+    try: return conn.read(ttl=0)
+    except: return None
 
 # ─── SIDEBAR ──────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 📚 SIDE")
     perfil = st.radio("Acesso:", ["👨‍🏫 Professor(a)", "🔑 Coordenação"], label_visibility="collapsed")
     st.divider()
-    st.caption(f"📍 Maracaju/MS | 🗓️ {datetime.now().strftime('%d/%m/%Y')}")
+    st.caption(f"Maracaju/MS | {datetime.now().strftime('%d/%m/%Y')}")
 
 st.markdown('<div class="page-header"><h1>📚 Portal de Simulados</h1><p>Escola Estadual Padre Constantino de Monte — SIDE</p></div>', unsafe_allow_html=True)
 
@@ -117,79 +108,96 @@ if perfil == "👨‍🏫 Professor(a)":
     st.subheader("Lançamento de Questões")
     
     with st.form("form_simulado", clear_on_submit=False):
-        st.markdown('<p class="section-label">👤 Identificação</p>', unsafe_allow_html=True)
         c1, c2, c3 = st.columns([2, 1, 2])
-        with c1: nome_professor = st.text_input("Nome do(a) Professor(a)*", value=st.session_state["prof_nome"])
-        with c2: 
-            idx_t = LISTA_TURMAS.index(st.session_state["prof_turma"]) if st.session_state["prof_turma"] in LISTA_TURMAS else 0
-            turma = st.selectbox("Turma*", LISTA_TURMAS, index=idx_t)
-        with c3:
-            idx_d = LISTA_DISCS.index(st.session_state["prof_disc"]) if st.session_state["prof_disc"] in LISTA_DISCS else 0
-            disciplina = st.selectbox("Disciplina*", LISTA_DISCS, index=idx_d)
+        with c1: nome_professor = st.text_input("Nome do(a) Professor(a)*")
+        with c2: turma = st.selectbox("Turma*", LISTA_TURMAS)
+        with c3: disciplina = st.selectbox("Disciplina*", LISTA_DISCS)
 
         st.divider()
-        st.markdown('<p class="section-label">📝 Questão</p>', unsafe_allow_html=True)
-        habilidade = st.text_input("Habilidade MS*", value=st.session_state["q_hab"])
-        enunciado = st.text_area("Pergunta*", value=st.session_state["q_enun"], height=150)
+        habilidade = st.text_input("Habilidade MS*")
+        enunciado = st.text_area("Pergunta*", height=150)
+        link_imagem = st.text_input("🔗 Link da Imagem (opcional)")
         
         ca, cb = st.columns(2)
         with ca:
-            alt_a = st.text_input("Alternativa A*", value=st.session_state["q_a"])
-            alt_b = st.text_input("Alternativa B*", value=st.session_state["q_b"])
-            alt_c = st.text_input("Alternativa C*", value=st.session_state["q_c"])
+            alt_a = st.text_input("Alternativa A*")
+            alt_b = st.text_input("Alternativa B*")
+            alt_c = st.text_input("Alternativa C*")
         with cb:
-            alt_d = st.text_input("Alternativa D*", value=st.session_state["q_d"])
-            alt_e = st.text_input("Alternativa E*", value=st.session_state["q_e"])
+            alt_d = st.text_input("Alternativa D*")
+            alt_e = st.text_input("Alternativa E*")
 
         gabarito = st.radio("✅ Alternativa Correta*", ["A", "B", "C", "D", "E"], horizontal=True)
         btn_salvar = st.form_submit_button("🚀 Cadastrar Questão")
 
         if btn_salvar:
             if not nome_professor or not habilidade or not enunciado or not all([alt_a, alt_b, alt_c, alt_d, alt_e]):
-                st.error("⚠️ Por favor, preencha todos os campos obrigatórios.")
-            elif conn:
-                with st.spinner("🚀 Processando sua questão..."):
-                    time.sleep(1.5) # Animação de espera
+                st.error("⚠️ Preencha todos os campos obrigatórios.")
+            else:
+                with st.spinner("🚀 Processando e salvando questão..."):
+                    time.sleep(1.5) # Efeito visual
                     try:
                         df_atual = carregar_dados()
-                        if df_atual is None or df_atual.empty:
-                            df_atual = pd.DataFrame(columns=["Data", "Professor (a)", "Disciplina", "Turma", "Habilidade", "Pergunta", "A", "B", "C", "D", "E", "Correta", "Link Imagem"])
-                        
                         nova_linha = pd.DataFrame([{
                             "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
                             "Professor (a)": nome_professor,
-                            "Disciplina": disciplina,
-                            "Turma": turma,
-                            "Habilidade": habilidade,
-                            "Pergunta": enunciado,
+                            "Disciplina": disciplina, "Turma": turma,
+                            "Habilidade": habilidade, "Pergunta": enunciado,
                             "A": alt_a, "B": alt_b, "C": alt_c, "D": alt_d, "E": alt_e,
-                            "Correta": gabarito, "Link Imagem": ""
+                            "Correta": gabarito, "Link Imagem": link_imagem
                         }])
-                        
                         conn.update(data=pd.concat([df_atual, nova_linha], ignore_index=True))
-                        st.session_state.log_atividades.append(f"{datetime.now().strftime('%H:%M')} - {nome_professor} cadastrou questão.")
-                        st.toast(f"Questão de {disciplina} enviada!", icon='✅')
                         st.balloons()
-                        st.success("✨ Questão salva com sucesso no banco de dados!")
-                        # st.rerun() # Opcional: remover se quiser manter os dados na tela para baixar o docx
+                        st.toast("Questão enviada!", icon='✅')
+                        st.success("✨ Salvo com sucesso!")
                     except Exception as e: st.error(f"Erro: {e}")
 
-    # Novo: Se houver dados preenchidos, permite baixar em DOCX
     if enunciado:
         st.markdown("---")
-        st.markdown('<p class="section-label">📄 Exportação Rápida</p>', unsafe_allow_html=True)
-        dados_doc = {
+        docx_file = gerar_docx({
             'prof_nome': nome_professor, 'prof_disc': disciplina, 'prof_turma': turma,
             'q_hab': habilidade, 'q_enun': enunciado, 'q_a': alt_a, 'q_b': alt_b,
             'q_c': alt_c, 'q_d': alt_d, 'q_e': alt_e, 'gabarito': gabarito
-        }
-        docx_file = gerar_docx(dados_doc)
-        st.download_button(
-            label="⬇️ Baixar esta Questão em Word (.docx)",
-            data=docx_file,
-            file_name=f"Questao_{disciplina}_{turma}.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            use_container_width=True
-        )
+        })
+        st.download_button("⬇️ Baixar Questão em Word (Docx)", data=docx_file, file_name=f"Questao_{turma}.docx", use_container_width=True)
 
-# (O restante do código para a Coordenação permanece igual, mas agora sem a opção de planilha no perfil do Professor)
+# ═══════════════════════════════════════════════════════════════════════════════
+# ÁREA DA COORDENAÇÃO (COM CORREÇÃO DE CARACTERES NO PDF)
+# ═══════════════════════════════════════════════════════════════════════════════
+else:
+    st.subheader("Área da Coordenação")
+    senha = st.text_input("Senha:", type="password")
+
+    if senha == SENHA_COORD:
+        df = carregar_dados()
+        if df is not None and not df.empty:
+            st.metric("Total de Questões", len(df))
+            st.dataframe(df, use_container_width=True)
+
+            if st.button("📄 Gerar Banco de Questões (PDF)"):
+                pdf = FPDF()
+                pdf.set_auto_page_break(auto=True, margin=20)
+                pdf.add_page()
+                pdf.set_font("Arial", "B", 14)
+                pdf.cell(0, 10, "BANCO DE QUESTÕES - SIDE", ln=True, align="C")
+                pdf.ln(10)
+
+                for idx, (_, r) in enumerate(df.iterrows(), 1):
+                    pdf.set_font("Arial", "B", 11)
+                    # Aplica a limpeza de texto aqui para evitar o "?"
+                    titulo = f"QUESTÃO {idx:02d} ({limpar_texto_pdf(r.get('Disciplina'))})"
+                    pdf.multi_cell(0, 6, titulo)
+                    
+                    pdf.set_font("Arial", "", 11)
+                    pergunta = limpar_texto_pdf(r.get("Pergunta"))
+                    pdf.multi_cell(0, 6, pergunta)
+                    pdf.ln(2)
+
+                    for l in ["A", "B", "C", "D", "E"]:
+                        alt = limpar_texto_pdf(r.get(l))
+                        pdf.cell(10)
+                        pdf.multi_cell(0, 6, f"({l}) {alt}")
+                    pdf.ln(5)
+
+                pdf_bytes = pdf.output(dest='S').encode('latin-1', 'replace')
+                st.download_button("⬇️ Baixar PDF Corrigido", data=pdf_bytes, file_name="banco_questoes.pdf", use_container_width=True)
