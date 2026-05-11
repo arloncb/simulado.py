@@ -402,6 +402,111 @@ def gerar_docx_questoes(df_export):
     buffer.seek(0)
     return buffer
 
+# ─── FUNÇÃO PARA GERAR DOCX DO GABARITO ─────────────────────────────────────
+def gerar_docx_gabarito(df_export):
+    from docx.shared import Pt, RGBColor, Cm
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.enum.table import WD_ALIGN_VERTICAL
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+
+    doc = Document()
+
+    # ── Margens ──
+    section = doc.sections[0]
+    section.top_margin    = Cm(2.0)
+    section.bottom_margin = Cm(2.0)
+    section.left_margin   = Cm(2.5)
+    section.right_margin  = Cm(2.5)
+
+    # ── Título ──
+    titulo = doc.add_paragraph()
+    titulo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run_t = titulo.add_run("GABARITO — BANCO DE QUESTÕES SIDE")
+    run_t.bold = True
+    run_t.font.size = Pt(15)
+    run_t.font.color.rgb = RGBColor(0x1a, 0x3a, 0x2a)
+
+    # ── Subtítulo com filtros aplicados ──
+    sub = doc.add_paragraph()
+    sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run_s = sub.add_run(
+        f"Escola Estadual Padre Constantino de Monte — Maracaju/MS\n"
+        f"Gerado em: {datetime.now().strftime('%d/%m/%Y às %H:%M')}"
+    )
+    run_s.font.size = Pt(9)
+    run_s.font.color.rgb = RGBColor(0x55, 0x55, 0x55)
+    doc.add_paragraph()
+
+    # ── Tabela ──
+    colunas = ["Nº", "Disciplina", "Habilidade", "Turma", "Gabarito"]
+    tabela = doc.add_table(rows=1, cols=len(colunas))
+    tabela.style = "Table Grid"
+
+    # Cabeçalho
+    hdr = tabela.rows[0].cells
+    larguras = [Cm(1.2), Cm(3.5), Cm(6.5), Cm(2.0), Cm(2.0)]
+    for i, (cell, col_nome) in enumerate(zip(hdr, colunas)):
+        cell.width = larguras[i]
+        cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+        p = cell.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = p.add_run(col_nome)
+        run.bold = True
+        run.font.size = Pt(10)
+        run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+        # Fundo verde escuro no cabeçalho
+        tc_pr = cell._tc.get_or_add_tcPr()
+        shd = OxmlElement("w:shd")
+        shd.set(qn("w:val"), "clear")
+        shd.set(qn("w:color"), "auto")
+        shd.set(qn("w:fill"), "2D6A4F")
+        tc_pr.append(shd)
+
+    # Linhas de dados
+    for idx, (_, r) in enumerate(df_export.iterrows(), 1):
+        row_cells = tabela.add_row().cells
+        valores = [
+            f"{idx:02d}",
+            str(r.get("Disciplina", "")),
+            str(r.get("Habilidade", "")),
+            str(r.get("Turma", "")),
+            str(r.get("Correta", "")),
+        ]
+        fill_cor = "F0F7F4" if idx % 2 == 0 else "FFFFFF"
+        for i, (cell, val) in enumerate(zip(row_cells, valores)):
+            cell.width = larguras[i]
+            cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+            p = cell.paragraphs[0]
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER if i in [0, 4] else WD_ALIGN_PARAGRAPH.LEFT
+            run = p.add_run(val)
+            run.font.size = Pt(9.5)
+            # Coluna Gabarito em destaque
+            if i == 4:
+                run.bold = True
+                run.font.color.rgb = RGBColor(0x1B, 0x43, 0x32)
+            # Zebra striping
+            tc_pr = cell._tc.get_or_add_tcPr()
+            shd = OxmlElement("w:shd")
+            shd.set(qn("w:val"), "clear")
+            shd.set(qn("w:color"), "auto")
+            shd.set(qn("w:fill"), fill_cor)
+            tc_pr.append(shd)
+
+    # ── Rodapé com total ──
+    doc.add_paragraph()
+    rodape = doc.add_paragraph()
+    rodape.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    run_r = rodape.add_run(f"Total de questões: {len(df_export)}")
+    run_r.font.size = Pt(9)
+    run_r.font.color.rgb = RGBColor(0x55, 0x55, 0x55)
+    run_r.italic = True
+
+    buffer = BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
+
 # ─── CONSTANTES E CONEXÃO ────────────────────────────────────────────────────
 LISTA_TURMAS = ["4° A", "5° A", "6° A", "6° B", "6° C", "7° A", "8° A",
                 "9° A", "9° B", "9° C", "9° D", "1° A", "1° B", "2° A", "3° A"]
@@ -625,21 +730,61 @@ else:
                         unsafe_allow_html=True)
 
             if not df_v.empty:
-                col_info, col_btn = st.columns([2, 1])
-                with col_info:
-                    st.markdown(
-                        f"<small style='color:#a8d5bc'>Serão exportadas <b>{sel}</b> questão(ões) "
-                        f"no formato Word (.docx) com enunciados, alternativas e imagens.</small>",
-                        unsafe_allow_html=True
-                    )
-                with col_btn:
-                    with st.spinner("Gerando arquivo Word..."):
-                        doc_banco = gerar_docx_questoes(df_v)
+                st.markdown(
+                    f"<small style='color:#a8d5bc'>Serão exportadas <b>{sel}</b> questão(ões). "
+                    f"Escolha o tipo de documento abaixo:</small>",
+                    unsafe_allow_html=True
+                )
+                st.markdown("<br>", unsafe_allow_html=True)
+
+                with st.spinner("Preparando documentos..."):
+                    doc_banco   = gerar_docx_questoes(df_v)
+                    doc_gabarito = gerar_docx_gabarito(df_v)
+
+                data_str = datetime.now().strftime('%d_%m_%Y')
+
+                col_banco, col_gab = st.columns(2)
+
+                with col_banco:
+                    st.markdown("""
+                    <div style='background:rgba(20,42,30,0.55);border:1px solid rgba(45,106,79,0.35);
+                                border-radius:12px;padding:16px 20px;margin-bottom:12px;'>
+                        <div style='font-size:1.4rem;margin-bottom:6px;'>📄</div>
+                        <div style='font-weight:700;color:#74c69d;font-size:0.95rem;margin-bottom:4px;'>
+                            Banco de Questões
+                        </div>
+                        <div style='font-size:0.78rem;color:#a8d5bc;line-height:1.5;'>
+                            Documento completo com enunciados,<br>alternativas e imagens de cada questão.
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
                     st.download_button(
-                        label="⬇️ Baixar Banco em Word (.docx)",
+                        label="⬇️ Baixar Banco Completo (.docx)",
                         data=doc_banco,
-                        file_name=f"Banco_SIDE_{datetime.now().strftime('%d_%m_%Y')}.docx",
-                        use_container_width=True
+                        file_name=f"Banco_SIDE_{data_str}.docx",
+                        use_container_width=True,
+                        key="btn_banco"
+                    )
+
+                with col_gab:
+                    st.markdown("""
+                    <div style='background:rgba(20,42,30,0.55);border:1px solid rgba(45,106,79,0.35);
+                                border-radius:12px;padding:16px 20px;margin-bottom:12px;'>
+                        <div style='font-size:1.4rem;margin-bottom:6px;'>✅</div>
+                        <div style='font-weight:700;color:#74c69d;font-size:0.95rem;margin-bottom:4px;'>
+                            Gabarito
+                        </div>
+                        <div style='font-size:0.78rem;color:#a8d5bc;line-height:1.5;'>
+                            Tabela com número, disciplina,<br>habilidade e resposta correta de cada questão.
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    st.download_button(
+                        label="✅ Baixar Gabarito (.docx)",
+                        data=doc_gabarito,
+                        file_name=f"Gabarito_SIDE_{data_str}.docx",
+                        use_container_width=True,
+                        key="btn_gabarito"
                     )
             else:
                 st.warning("⚠️ Nenhuma questão encontrada com os filtros selecionados.")
