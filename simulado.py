@@ -130,9 +130,9 @@ if perfil == "👨‍🏫 Professor(a)":
         
         ca, cb = st.columns(2)
         with ca:
-            a, b, c = st.text_input("Alt A*"), st.text_input("Alt B*"), st.text_input("Alt C*")
+            a, b, c = st.text_input("letra A*"), st.text_input("letra B*"), st.text_input("letra C*")
         with cb:
-            d, e = st.text_input("Alt D*"), st.text_input("Alt E*")
+            d, e = st.text_input("letra D*"), st.text_input("letra E*")
         
         gab_p = st.radio("✅ Alternativa Correta*", ["A", "B", "C", "D", "E"], horizontal=True)
         btn_enviar = st.form_submit_button("🚀 Enviar Questão")
