@@ -17,13 +17,354 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ─── TRATAMENTO DE TEXTO (EVITAR CARACTERES ESPECIAIS) ──────────────────────
+# ─── CSS GLOBAL ───────────────────────────────────────────────────────────────
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ── Reset e base ── */
+html, body, [class*="css"] {
+    font-family: 'Sora', sans-serif !important;
+}
+
+/* ── Fundo geral ── */
+.stApp {
+    background: #0d1f17;
+    background-image:
+        radial-gradient(ellipse 80% 60% at 20% 0%, rgba(45,106,79,0.25) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 100%, rgba(26,58,42,0.30) 0%, transparent 55%);
+}
+
+/* ── Sidebar ── */
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #0a1710 0%, #132a1e 100%) !important;
+    border-right: 1px solid rgba(45,106,79,0.35) !important;
+}
+section[data-testid="stSidebar"] * {
+    color: #c8e6d4 !important;
+}
+section[data-testid="stSidebar"] .stRadio label {
+    color: #c8e6d4 !important;
+}
+
+/* ── Header animado ── */
+@keyframes fadeSlideDown {
+    from { opacity: 0; transform: translateY(-22px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.header-box {
+    background: linear-gradient(135deg, #1a3a2a 0%, #2d6a4f 60%, #1e4d38 100%);
+    border: 1px solid rgba(74,183,108,0.30);
+    border-radius: 16px;
+    padding: 30px 36px;
+    color: white;
+    margin-bottom: 28px;
+    animation: fadeSlideDown 0.6s ease both;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08);
+    position: relative;
+    overflow: hidden;
+}
+.header-box::before {
+    content: '';
+    position: absolute;
+    top: -40%; right: -10%;
+    width: 300px; height: 300px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(74,183,108,0.12) 0%, transparent 70%);
+    pointer-events: none;
+}
+.header-box h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    margin: 0 0 6px 0;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.4);
+}
+.header-box p {
+    margin: 0;
+    opacity: 0.80;
+    font-size: 0.95rem;
+    font-weight: 300;
+    letter-spacing: 0.3px;
+}
+
+/* ── Cards de seção ── */
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.card-section {
+    background: rgba(20,42,30,0.65);
+    border: 1px solid rgba(45,106,79,0.35);
+    border-radius: 14px;
+    padding: 28px 32px;
+    margin-bottom: 20px;
+    animation: fadeUp 0.5s ease both;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.30);
+}
+
+/* ── Títulos de seção ── */
+.section-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #6fcf97;
+    letter-spacing: 0.4px;
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(111,207,151,0.4), transparent);
+    margin-left: 6px;
+}
+
+/* ── Inputs ── */
+.stTextInput input,
+.stTextArea textarea,
+.stSelectbox > div > div {
+    background: rgba(10,23,16,0.70) !important;
+    border: 1px solid rgba(45,106,79,0.50) !important;
+    border-radius: 10px !important;
+    color: #e0f0e8 !important;
+    font-family: 'Sora', sans-serif !important;
+    transition: border-color 0.25s, box-shadow 0.25s;
+}
+.stTextInput input:focus,
+.stTextArea textarea:focus {
+    border-color: rgba(111,207,151,0.70) !important;
+    box-shadow: 0 0 0 3px rgba(111,207,151,0.12) !important;
+}
+.stTextInput label,
+.stTextArea label,
+.stSelectbox label,
+.stRadio label,
+.stMultiSelect label {
+    color: #a8d5bc !important;
+    font-size: 0.85rem !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.3px;
+}
+
+/* ── Radio Buttons ── */
+.stRadio div[role="radiogroup"] {
+    gap: 10px;
+}
+.stRadio div[role="radiogroup"] label {
+    background: rgba(15,32,22,0.60);
+    border: 1px solid rgba(45,106,79,0.40);
+    border-radius: 8px;
+    padding: 6px 14px;
+    transition: all 0.2s ease;
+    color: #c8e6d4 !important;
+}
+.stRadio div[role="radiogroup"] label:hover {
+    border-color: rgba(111,207,151,0.65);
+    background: rgba(45,106,79,0.25);
+}
+
+/* ── Botão principal ── */
+@keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(111,207,151,0.35); }
+    50%       { box-shadow: 0 0 0 8px rgba(111,207,151,0); }
+}
+.stButton > button,
+.stDownloadButton > button,
+.stFormSubmitButton > button {
+    background: linear-gradient(135deg, #2d6a4f 0%, #40916c 100%) !important;
+    color: #e8f7ef !important;
+    border: 1px solid rgba(111,207,151,0.45) !important;
+    border-radius: 10px !important;
+    font-family: 'Sora', sans-serif !important;
+    font-weight: 600 !important;
+    font-size: 0.92rem !important;
+    letter-spacing: 0.3px;
+    padding: 0.55rem 1.4rem !important;
+    transition: all 0.25s ease !important;
+    position: relative;
+    overflow: hidden;
+}
+.stButton > button::before,
+.stFormSubmitButton > button::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+    transition: left 0.4s ease;
+}
+.stButton > button:hover::before,
+.stFormSubmitButton > button:hover::before {
+    left: 100%;
+}
+.stButton > button:hover,
+.stDownloadButton > button:hover,
+.stFormSubmitButton > button:hover {
+    background: linear-gradient(135deg, #40916c 0%, #52b788 100%) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(45,106,79,0.50) !important;
+    animation: pulse-glow 1.5s infinite;
+}
+.stButton > button:active,
+.stFormSubmitButton > button:active {
+    transform: translateY(0px) !important;
+    box-shadow: 0 2px 8px rgba(45,106,79,0.35) !important;
+}
+
+/* ── Download button destaque ── */
+.stDownloadButton > button {
+    background: linear-gradient(135deg, #1b4332 0%, #2d6a4f 100%) !important;
+    border: 1px solid rgba(111,207,151,0.55) !important;
+    width: 100%;
+}
+.stDownloadButton > button:hover {
+    background: linear-gradient(135deg, #2d6a4f 0%, #40916c 100%) !important;
+}
+
+/* ── Métricas ── */
+div[data-testid="stMetric"] {
+    background: rgba(20,42,30,0.65) !important;
+    border: 1px solid rgba(45,106,79,0.35) !important;
+    border-radius: 12px !important;
+    padding: 16px 22px !important;
+    backdrop-filter: blur(6px);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+div[data-testid="stMetric"]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.30);
+}
+div[data-testid="stMetric"] label {
+    color: #74c69d !important;
+    font-size: 0.82rem !important;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
+    color: #d8f3dc !important;
+    font-size: 2.1rem !important;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace !important;
+}
+
+/* ── Dataframe ── */
+div[data-testid="stDataFrame"] {
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(45,106,79,0.30) !important;
+}
+
+/* ── Divider ── */
+hr {
+    border-color: rgba(45,106,79,0.30) !important;
+    margin: 20px 0 !important;
+}
+
+/* ── Alertas / Toasts ── */
+div[data-testid="stAlert"] {
+    border-radius: 10px !important;
+    border-left-width: 4px !important;
+    font-family: 'Sora', sans-serif !important;
+}
+
+/* ── Progress bar ── */
+.stProgress > div > div > div {
+    background: linear-gradient(90deg, #40916c, #74c69d) !important;
+    border-radius: 999px !important;
+}
+.stProgress > div > div {
+    background: rgba(20,42,30,0.55) !important;
+    border-radius: 999px !important;
+}
+
+/* ── Spinner ── */
+div[data-testid="stSpinner"] {
+    color: #6fcf97 !important;
+}
+
+/* ── Multiselect tags ── */
+span[data-baseweb="tag"] {
+    background: rgba(45,106,79,0.55) !important;
+    border-radius: 6px !important;
+}
+
+/* ── Cabeçalho da sidebar ── */
+.sidebar-logo {
+    text-align: center;
+    padding: 12px 0 8px 0;
+}
+.sidebar-logo .logo-icon {
+    font-size: 2.4rem;
+    line-height: 1;
+    display: block;
+    margin-bottom: 6px;
+    filter: drop-shadow(0 0 10px rgba(111,207,151,0.5));
+}
+.sidebar-logo .logo-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #6fcf97;
+    letter-spacing: 2px;
+}
+.sidebar-logo .logo-sub {
+    font-size: 0.72rem;
+    color: #74c69d;
+    opacity: 0.65;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+/* ── Badge de data ── */
+.date-badge {
+    background: rgba(45,106,79,0.30);
+    border: 1px solid rgba(74,183,108,0.25);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 0.78rem;
+    color: #74c69d;
+    font-family: 'JetBrains Mono', monospace;
+    text-align: center;
+    margin-top: 8px;
+}
+
+/* ── Tag de campo obrigatório ── */
+.req-badge {
+    display: inline-block;
+    background: rgba(231,111,81,0.20);
+    color: #e76f51;
+    border: 1px solid rgba(231,111,81,0.35);
+    border-radius: 4px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 1px 6px;
+    margin-left: 6px;
+    letter-spacing: 0.5px;
+    vertical-align: middle;
+}
+
+/* ── Animação de entrada dos campos ── */
+@keyframes fadeInField {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.field-animated {
+    animation: fadeInField 0.4s ease both;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ─── TRATAMENTO DE TEXTO ──────────────────────────────────────────────────────
 def limpar_texto(texto):
     if pd.isna(texto) or texto is None:
         return ""
     t = str(texto).strip()
     substituicoes = {
-        '“': '"', '”': '"', '‘': "'", '’': "'",
+        '"': '"', '"': '"', ''': "'", ''': "'",
         '–': '-', '—': '-', '…': '...',
         '\u2013': '-', '\u2014': '-', '\u201c': '"', '\u201d': '"',
         '\u2018': "'", '\u2019': "'", '\u2026': '...'
@@ -32,25 +373,15 @@ def limpar_texto(texto):
         t = t.replace(original, novo)
     return t
 
-# ─── FUNÇÃO PARA GERAR DOCX (PADRÃO SIDE) ──────────────────────────────────
+# ─── FUNÇÃO PARA GERAR DOCX (PADRÃO SIDE) ───────────────────────────────────
 def gerar_docx_questoes(df_export):
     doc = Document()
-    
     for idx, (_, r) in enumerate(df_export.iterrows(), 1):
-        # 1. Disciplina
         doc.add_paragraph(f"Disciplina: {r.get('Disciplina')}")
-        
-        # 2. Habilidade
         doc.add_paragraph(f"Habilidade: {r.get('Habilidade')}")
-        
-        # 3. Número da questão (Dinâmico)
         p_num = doc.add_paragraph()
         p_num.add_run(f"QUESTÃO {idx:02d}").bold = True
-        
-        # 4. Enunciado da questão
         doc.add_paragraph(limpar_texto(r.get("Pergunta")))
-        
-        # 5. Imagem (se houver)
         link_img = r.get("Link Imagem")
         if pd.notna(link_img) and str(link_img).strip().lower() not in ["", "nan"]:
             try:
@@ -59,30 +390,25 @@ def gerar_docx_questoes(df_export):
                     img_io = BytesIO(resp.content)
                     doc.add_picture(img_io, width=Inches(4.0))
             except:
-                pass 
-        
-        # 6. Alternativas uma sobre a outra
+                pass
         for letra in ["A", "B", "C", "D", "E"]:
             conteudo = r.get(letra)
             if pd.notna(conteudo):
                 doc.add_paragraph(f"({letra}) {limpar_texto(conteudo)}")
-        
-        # Linha separadora entre questões
         doc.add_paragraph("-" * 30)
         doc.add_paragraph("\n")
-    
     buffer = BytesIO()
     doc.save(buffer)
     buffer.seek(0)
     return buffer
 
-# ─── CONSTANTES E CONEXÃO ─────────────────────────────────────────────────────
-LISTA_TURMAS = ["4° A", "5° A", "6° A", "6° B", "6° C", "7° A", "8° A", "9° A", "9° B", "9° C", "9° D", "1° A", "1° B", "2° A", "3° A"]
+# ─── CONSTANTES E CONEXÃO ────────────────────────────────────────────────────
+LISTA_TURMAS = ["4° A", "5° A", "6° A", "6° B", "6° C", "7° A", "8° A",
+                "9° A", "9° B", "9° C", "9° D", "1° A", "1° B", "2° A", "3° A"]
 
-# LISTA DE DISCIPLINAS ATUALIZADA
 LISTA_DISCS = [
-    "Arte", "Biologia", "Ciências", "Educação Física", "Filosofia", 
-    "Física", "Geografia", "História", "Língua Inglesa", 
+    "Arte", "Biologia", "Ciências", "Educação Física", "Filosofia",
+    "Física", "Geografia", "História", "Língua Inglesa",
     "Língua Portuguesa", "Matemática", "Química", "Sociologia"
 ]
 
@@ -97,114 +423,226 @@ def carregar_dados():
     except:
         return None
 
-# ─── INTERFACE VISUAL ─────────────────────────────────────────────────────────
+# ─── HEADER ──────────────────────────────────────────────────────────────────
 st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-    .header-box {
-        background: linear-gradient(135deg, #1a3a2a 0%, #2d6a4f 100%);
-        border-radius: 12px; padding: 25px; color: white; margin-bottom: 20px;
-    }
-</style>
 <div class="header-box">
     <h1>📚 Portal de Simulados</h1>
     <p>Escola Estadual Padre Constantino de Monte — Maracaju/MS</p>
 </div>
 """, unsafe_allow_html=True)
 
+# ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("## 📚 SIDE")
-    perfil = st.radio("Selecione o Acesso:", ["👨‍🏫 Professor(a)", "🔑 Coordenação"])
+    st.markdown("""
+    <div class="sidebar-logo">
+        <span class="logo-icon">📚</span>
+        <div class="logo-title">SIDE</div>
+        <div class="logo-sub">Sistema de Questões</div>
+    </div>
+    """, unsafe_allow_html=True)
+    
     st.divider()
-    st.caption(f"📅 {datetime.now().strftime('%d/%m/%Y')}")
+    perfil = st.radio(
+        "Selecione o Acesso:",
+        ["👨‍🏫 Professor(a)", "🔑 Coordenação"],
+        label_visibility="visible"
+    )
+    st.divider()
+    
+    st.markdown(f"""
+    <div class="date-badge">
+        📅 {datetime.now().strftime('%d/%m/%Y — %H:%M')}
+    </div>
+    """, unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PERFIL PROFESSOR
 # ═══════════════════════════════════════════════════════════════════════════════
 if perfil == "👨‍🏫 Professor(a)":
-    st.subheader("Lançamento de Questões")
+
+    st.markdown('<div class="section-title">✏️ Lançamento de Questões</div>', unsafe_allow_html=True)
+
     with st.form("form_prof", clear_on_submit=True):
+
+        # ── Bloco 1: Identificação ──
+        st.markdown('<div class="section-title">👤 Identificação</div>', unsafe_allow_html=True)
         c1, c2, c3 = st.columns([2, 1, 2])
-        with c1: nome_p = st.text_input("Nome do(a) Professor(a)*")
-        with c2: turma_p = st.selectbox("Turma*", LISTA_TURMAS)
-        with c3: disc_p = st.selectbox("Disciplina*", sorted(LISTA_DISCS))
-        
+        with c1: nome_p  = st.text_input("Nome do(a) Professor(a) *")
+        with c2: turma_p = st.selectbox("Turma *", LISTA_TURMAS)
+        with c3: disc_p  = st.selectbox("Disciplina *", sorted(LISTA_DISCS))
+
         st.divider()
-        hab_p = st.text_input("Habilidade MS*")
-        enun_p = st.text_area("Pergunta*", height=150)
-        link_p = st.text_input("🔗 Link da Imagem (opcional)")
-        
+
+        # ── Bloco 2: Conteúdo ──
+        st.markdown('<div class="section-title">📝 Conteúdo da Questão</div>', unsafe_allow_html=True)
+        hab_p  = st.text_input("Habilidade MS *")
+        enun_p = st.text_area("Enunciado da Pergunta *", height=150,
+                              placeholder="Digite o enunciado da questão aqui...")
+        link_p = st.text_input("🔗 Link da Imagem (opcional)",
+                               placeholder="https://exemplo.com/imagem.png")
+
+        st.divider()
+
+        # ── Bloco 3: Alternativas ──
+        st.markdown('<div class="section-title">🔤 Alternativas</div>', unsafe_allow_html=True)
         ca, cb = st.columns(2)
         with ca:
-            a, b, c = st.text_input("letra A*"), st.text_input("letra B*"), st.text_input("letra C*")
+            a = st.text_input("Alternativa A *", placeholder="Opção A")
+            b = st.text_input("Alternativa B *", placeholder="Opção B")
+            c = st.text_input("Alternativa C *", placeholder="Opção C")
         with cb:
-            d, e = st.text_input("letra D*"), st.text_input("letra E*")
-        
-        gab_p = st.radio("✅ Alternativa Correta*", ["A", "B", "C", "D", "E"], horizontal=True)
-        btn_enviar = st.form_submit_button("🚀 Enviar Questão")
+            d = st.text_input("Alternativa D *", placeholder="Opção D")
+            e = st.text_input("Alternativa E *", placeholder="Opção E")
+
+        st.divider()
+
+        # ── Gabarito ──
+        st.markdown('<div class="section-title">✅ Gabarito</div>', unsafe_allow_html=True)
+        gab_p = st.radio("Alternativa Correta *", ["A", "B", "C", "D", "E"], horizontal=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        btn_enviar = st.form_submit_button("🚀 Enviar Questão", use_container_width=True)
 
         if btn_enviar:
-            if not all([nome_p, hab_p, enun_p, a, b, c, d, e]):
-                st.error("⚠️ Por favor, preencha todos os campos obrigatórios.")
-            else:
-                with st.spinner("🚀 Salvando no banco de dados..."):
-                    time.sleep(1.2)
-                    df_atual = carregar_dados()
-                    nova_q = pd.DataFrame([{
-                        "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                        "Professor (a)": nome_p, "Disciplina": disc_p, "Turma": turma_p,
-                        "Habilidade": hab_p, "Pergunta": enun_p, "A": a, "B": b, "C": c, "D": d, "E": e,
-                        "Correta": gab_p, "Link Imagem": link_p
-                    }])
-                    conn.update(data=pd.concat([df_atual, nova_q], ignore_index=True))
-                    st.balloons()
-                    st.toast("Sucesso!", icon='✅')
-                    st.success("✨ Questão registrada com sucesso!")
+            campos_vazios = [f for f, v in {
+                "Nome": nome_p, "Habilidade": hab_p, "Enunciado": enun_p,
+                "Alt. A": a, "Alt. B": b, "Alt. C": c, "Alt. D": d, "Alt. E": e
+            }.items() if not v]
 
+            if campos_vazios:
+                st.error(f"⚠️ Campos obrigatórios não preenchidos: **{', '.join(campos_vazios)}**")
+            else:
+                # Barra de progresso animada
+                barra = st.progress(0, text="Preparando dados...")
+                for pct, msg in [(20, "Validando campos..."),
+                                 (45, "Conectando ao banco de dados..."),
+                                 (70, "Gravando questão..."),
+                                 (90, "Finalizando..."),
+                                 (100, "Concluído!")]:
+                    time.sleep(0.3)
+                    barra.progress(pct, text=msg)
+
+                df_atual = carregar_dados()
+                nova_q = pd.DataFrame([{
+                    "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                    "Professor (a)": nome_p, "Disciplina": disc_p, "Turma": turma_p,
+                    "Habilidade": hab_p, "Pergunta": enun_p,
+                    "A": a, "B": b, "C": c, "D": d, "E": e,
+                    "Correta": gab_p, "Link Imagem": link_p
+                }])
+                conn.update(data=pd.concat([df_atual, nova_q], ignore_index=True))
+
+                barra.empty()
+                st.balloons()
+                st.toast("Questão salva com sucesso!", icon="✅")
+                st.success("✨ Questão registrada com sucesso no banco de dados!")
+
+    # ── Download rápido ──
     if enun_p:
         st.divider()
+        st.markdown('<div class="section-title">⬇️ Download Rápido</div>', unsafe_allow_html=True)
         temp_df = pd.DataFrame([{
-            "Disciplina": disc_p, "Habilidade": hab_p, "Pergunta": enun_p, 
+            "Disciplina": disc_p, "Habilidade": hab_p, "Pergunta": enun_p,
             "A": a, "B": b, "C": c, "D": d, "E": e, "Link Imagem": link_p
         }])
         doc_prof = gerar_docx_questoes(temp_df)
-        st.download_button("⬇️ Baixar esta Questão em Word", doc_prof, "Minha_Questao.docx", use_container_width=True)
+        st.download_button(
+            "⬇️ Baixar esta Questão em Word (.docx)",
+            doc_prof, "Minha_Questao.docx",
+            use_container_width=True
+        )
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PERFIL COORDENAÇÃO
 # ═══════════════════════════════════════════════════════════════════════════════
 else:
-    st.subheader("Portal da Coordenação")
-    senha = st.text_input("Chave de Acesso:", type="password")
-    
+    st.markdown('<div class="section-title">🔑 Acesso Restrito — Coordenação</div>',
+                unsafe_allow_html=True)
+
+    senha = st.text_input("Chave de Acesso:", type="password",
+                          placeholder="Digite a senha de coordenação")
+
     if senha == SENHA_COORD:
-        df = carregar_dados()
+
+        # Loader inicial
+        with st.spinner("🔄 Carregando banco de questões..."):
+            barra_load = st.progress(0, text="Iniciando...")
+            for pct, msg in [(30, "Conectando ao Google Sheets..."),
+                             (65, "Lendo questões..."),
+                             (100, "Banco carregado!")]:
+                time.sleep(0.25)
+                barra_load.progress(pct, text=msg)
+            df = carregar_dados()
+            barra_load.empty()
+
         if df is not None and not df.empty:
-            st.markdown("### 🔍 Filtros Seletores")
+
+            # ── Métricas rápidas ──
+            st.markdown('<div class="section-title">📊 Visão Geral</div>', unsafe_allow_html=True)
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("📋 Total de Questões", len(df))
+            m2.metric("📚 Disciplinas", df["Disciplina"].nunique())
+            m3.metric("🏫 Turmas", df["Turma"].nunique())
+            m4.metric("👩‍🏫 Professores", df["Professor (a)"].nunique())
+
+            st.divider()
+
+            # ── Filtros ──
+            st.markdown('<div class="section-title">🔍 Filtros Seletores</div>',
+                        unsafe_allow_html=True)
             f1, f2, f3 = st.columns(3)
-            with f1: t_f = st.multiselect("Filtrar Turmas:", sorted(df["Turma"].unique()))
-            with f2: d_f = st.multiselect("Filtrar Disciplinas:", sorted(df["Disciplina"].unique()))
-            with f3: p_f = st.multiselect("Filtrar Professor(a):", sorted(df["Professor (a)"].unique()))
-            
+            with f1: t_f = st.multiselect("🏫 Turmas:", sorted(df["Turma"].unique()))
+            with f2: d_f = st.multiselect("📚 Disciplinas:", sorted(df["Disciplina"].unique()))
+            with f3: p_f = st.multiselect("👩‍🏫 Professor(a):", sorted(df["Professor (a)"].unique()))
+
             df_v = df.copy()
             if t_f: df_v = df_v[df_v["Turma"].isin(t_f)]
             if d_f: df_v = df_v[df_v["Disciplina"].isin(d_f)]
             if p_f: df_v = df_v[df_v["Professor (a)"].isin(p_f)]
-            
-            st.metric("Questões Selecionadas", len(df_v))
-            st.dataframe(df_v, use_container_width=True, hide_index=True)
-            
+
+            # Barra de progresso de seleção
+            total = len(df)
+            sel   = len(df_v)
+            pct_sel = int((sel / total) * 100) if total > 0 else 0
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            col_met, col_prog = st.columns([1, 3])
+            with col_met:
+                st.metric("✅ Questões Selecionadas", sel)
+            with col_prog:
+                st.markdown(f"<br><small style='color:#74c69d;font-size:0.78rem'>"
+                            f"Cobertura da seleção: **{pct_sel}%** do banco total</small>",
+                            unsafe_allow_html=True)
+                st.progress(pct_sel)
+
             st.divider()
-            
+            st.dataframe(df_v, use_container_width=True, hide_index=True)
+
+            st.divider()
+
+            # ── Exportar ──
+            st.markdown('<div class="section-title">📄 Exportar Banco Selecionado</div>',
+                        unsafe_allow_html=True)
+
             if not df_v.empty:
-                with st.spinner("Preparando arquivo Word..."):
-                    doc_banco = gerar_docx_questoes(df_v)
+                col_info, col_btn = st.columns([2, 1])
+                with col_info:
+                    st.markdown(
+                        f"<small style='color:#a8d5bc'>Serão exportadas <b>{sel}</b> questão(ões) "
+                        f"no formato Word (.docx) com enunciados, alternativas e imagens.</small>",
+                        unsafe_allow_html=True
+                    )
+                with col_btn:
+                    with st.spinner("Gerando arquivo Word..."):
+                        doc_banco = gerar_docx_questoes(df_v)
                     st.download_button(
-                        label="⬇️ Baixar Banco Selecionado em Word (Docx)", 
-                        data=doc_banco, 
-                        file_name=f"Banco_SIDE_{datetime.now().strftime('%d_%m')}.docx", 
+                        label="⬇️ Baixar Banco em Word (.docx)",
+                        data=doc_banco,
+                        file_name=f"Banco_SIDE_{datetime.now().strftime('%d_%m_%Y')}.docx",
                         use_container_width=True
                     )
             else:
-                st.warning("Nenhuma questão encontrada com os filtros selecionados.")
+                st.warning("⚠️ Nenhuma questão encontrada com os filtros selecionados.")
+
+    elif senha and senha != SENHA_COORD:
+        st.error("🔒 Senha incorreta. Tente novamente.")
