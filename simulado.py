@@ -373,7 +373,7 @@ def limpar_texto(texto):
         t = t.replace(original, novo)
     return t
 
-# ─── FUNÇÃO PARA GERAR DOCX (PADRÃO SIDE) ───────────────────────────────────
+# ─── FUNÇÃO PARA GERAR DOCX (PADRÃO SIDE) — COM CONVERSOR DO GOOGLE DRIVE ─────
 def gerar_docx_questoes(df_export):
     doc = Document()
     for idx, (_, r) in enumerate(df_export.iterrows(), 1):
@@ -382,15 +382,28 @@ def gerar_docx_questoes(df_export):
         p_num = doc.add_paragraph()
         p_num.add_run(f"QUESTÃO {idx:02d}").bold = True
         doc.add_paragraph(limpar_texto(r.get("Pergunta")))
+        
         link_img = r.get("Link Imagem")
         if pd.notna(link_img) and str(link_img).strip().lower() not in ["", "nan"]:
             try:
-                resp = requests.get(link_img, timeout=10)
+                url_final = str(link_img).strip()
+                
+                # [MUDANÇA AQUI] Converte link padrão do Google Drive para link de download direto
+                if "drive.google.com" in url_final:
+                    if "/file/d/" in url_final:
+                        id_arquivo = url_final.split("/file/d/")[1].split("/")[0]
+                        url_final = f"https://drive.google.com/uc?export=download&id={id_arquivo}"
+                    elif "id=" in url_final:
+                        id_arquivo = url_final.split("id=")[1].split("&")[0]
+                        url_final = f"https://drive.google.com/uc?export=download&id={id_arquivo}"
+
+                resp = requests.get(url_final, timeout=10)
                 if resp.status_code == 200:
                     img_io = BytesIO(resp.content)
                     doc.add_picture(img_io, width=Inches(4.0))
             except:
                 pass
+                
         for letra in ["A", "B", "C", "D", "E"]:
             conteudo = r.get(letra)
             if pd.notna(conteudo):
@@ -738,7 +751,7 @@ else:
                 st.markdown("<br>", unsafe_allow_html=True)
 
                 with st.spinner("Preparando documentos..."):
-                    doc_banco   = gerar_docx_questoes(df_v)
+                    doc_banco    = gerar_docx_questoes(df_v)
                     doc_gabarito = gerar_docx_gabarito(df_v)
 
                 data_str = datetime.now().strftime('%d_%m_%Y')
