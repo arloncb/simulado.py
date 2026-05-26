@@ -5,3 +5,5 @@ requests
 Pillow
 fpdf2
 python-docx
+streamlit-quill
+beautifulsoup4
