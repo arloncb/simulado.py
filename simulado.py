@@ -8,6 +8,8 @@ from datetime import datetime
 import os
 import requests
 import time
+from bs4 import BeautifulSoup
+from streamlit_quill import st_quill
 
 # ─── CONFIGURAÇÃO DA PÁGINA ───────────────────────────────────────────────────
 st.set_page_config(
@@ -170,7 +172,7 @@ section[data-testid="stSidebar"] .stRadio label {
 /* ── Botão principal ── */
 @keyframes pulse-glow {
     0%, 100% { box-shadow: 0 0 0 0 rgba(111,207,151,0.35); }
-    50%       { box-shadow: 0 0 0 8px rgba(111,207,151,0); }
+    50%        { box-shadow: 0 0 0 8px rgba(111,207,151,0); }
 }
 .stButton > button,
 .stDownloadButton > button,
@@ -355,6 +357,16 @@ span[data-baseweb="tag"] {
 .field-animated {
     animation: fadeInField 0.4s ease both;
 }
+
+/* ── Ajuste visual para o Quill ── */
+.quill-label {
+    color: #a8d5bc;
+    font-size: 0.85rem;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    margin-bottom: 6px;
+    display: block;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -373,6 +385,40 @@ def limpar_texto(texto):
         t = t.replace(original, novo)
     return t
 
+def _processar_elementos_html(p_doc, elementos):
+    """Função auxiliar para processar as tags HTML e adicionar ao parágrafo do Word."""
+    for elemento in elementos:
+        if elemento.name is None:  # Texto puro
+            run = p_doc.add_run(limpar_texto(str(elemento)))
+        elif elemento.name in ['strong', 'b']:
+            run = p_doc.add_run(limpar_texto(elemento.get_text()))
+            run.bold = True
+        elif elemento.name in ['em', 'i']:
+            run = p_doc.add_run(limpar_texto(elemento.get_text()))
+            run.italic = True
+        elif elemento.name == 'br':
+            p_doc.add_run('\n')
+        else:
+            # Fallback de segurança para outras tags do Quill
+            run = p_doc.add_run(limpar_texto(elemento.get_text()))
+
+def processar_html_para_docx(doc, texto_html):
+    """Lê o HTML gerado pelo Quill e insere no documento Word com as formatações."""
+    if pd.isna(texto_html) or not str(texto_html).strip():
+        return
+        
+    soup = BeautifulSoup(str(texto_html), "html.parser")
+    paragrafos_html = soup.find_all('p')
+    
+    if not paragrafos_html:
+        p_doc = doc.add_paragraph()
+        _processar_elementos_html(p_doc, soup.children)
+        return
+
+    for p_tag in paragrafos_html:
+        p_doc = doc.add_paragraph()
+        _processar_elementos_html(p_doc, p_tag.children)
+
 # ─── FUNÇÃO PARA GERAR DOCX (PADRÃO SIDE) — COM CONVERSOR DO GOOGLE DRIVE ─────
 def gerar_docx_questoes(df_export):
     doc = Document()
@@ -381,14 +427,16 @@ def gerar_docx_questoes(df_export):
         doc.add_paragraph(f"Habilidade: {r.get('Habilidade')}")
         p_num = doc.add_paragraph()
         p_num.add_run(f"QUESTÃO {idx:02d}").bold = True
-        doc.add_paragraph(limpar_texto(r.get("Pergunta")))
+        
+        # Chamada da nova função do BeautifulSoup
+        processar_html_para_docx(doc, r.get("Pergunta"))
         
         link_img = r.get("Link Imagem")
         if pd.notna(link_img) and str(link_img).strip().lower() not in ["", "nan"]:
             try:
                 url_final = str(link_img).strip()
                 
-                # [MUDANÇA AQUI] Converte link padrão do Google Drive para link de download direto
+                # Converte link padrão do Google Drive para link de download direto
                 if "drive.google.com" in url_final:
                     if "/file/d/" in url_final:
                         id_arquivo = url_final.split("/file/d/")[1].split("/")[0]
@@ -594,8 +642,16 @@ if perfil == "👨‍🏫 Professor(a)":
         # ── Bloco 2: Conteúdo ──
         st.markdown('<div class="section-title">📝 Conteúdo da Questão</div>', unsafe_allow_html=True)
         hab_p  = st.text_input("Habilidade MS *")
-        enun_p = st.text_area("Enunciado da Pergunta *", height=150,
-                              placeholder="Digite o enunciado da questão aqui...")
+        
+        # Componente Quill substituindo o st.text_area
+        st.markdown('<span class="quill-label">Enunciado da Pergunta *</span>', unsafe_allow_html=True)
+        enun_p = st_quill(
+            placeholder="Digite o enunciado da questão aqui. Utilize os botões para negrito e itálico.",
+            html=True,
+            toolbar=[['bold', 'italic'], ['clean']]
+        )
+        
+        st.markdown("<br>", unsafe_allow_html=True)
         link_p = st.text_input("🔗 Link da Imagem (opcional)",
                                placeholder="https://exemplo.com/imagem.png")
 
@@ -622,8 +678,11 @@ if perfil == "👨‍🏫 Professor(a)":
         btn_enviar = st.form_submit_button("🚀 Enviar Questão", use_container_width=True)
 
         if btn_enviar:
+            # Correção de checagem para o Quill que pode retornar tags HTML vazias (<p><br></p>)
+            enun_valido = enun_p and str(enun_p).strip() not in ["<p><br></p>", "<p></p>"]
+            
             campos_vazios = [f for f, v in {
-                "Nome": nome_p, "Habilidade": hab_p, "Enunciado": enun_p,
+                "Nome": nome_p, "Habilidade": hab_p, "Enunciado": enun_valido,
                 "Alt. A": a, "Alt. B": b, "Alt. C": c, "Alt. D": d, "Alt. E": e
             }.items() if not v]
 
@@ -656,7 +715,7 @@ if perfil == "👨‍🏫 Professor(a)":
                 st.success("✨ Questão registrada com sucesso no banco de dados!")
 
     # ── Download rápido ──
-    if enun_p:
+    if enun_p and str(enun_p).strip() not in ["<p><br></p>", "<p></p>"]:
         st.divider()
         st.markdown('<div class="section-title">⬇️ Download Rápido</div>', unsafe_allow_html=True)
         temp_df = pd.DataFrame([{
