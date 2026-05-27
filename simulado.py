@@ -569,6 +569,17 @@ def gerar_docx_gabarito(df_export):
     return buffer
 
 # ─── CONSTANTES E CONEXÃO ────────────────────────────────────────────────────
+LISTA_PROFESSORES = [
+    "", # Opção em branco para forçar a seleção
+    "ADALBERTO", "ANGELA", "ANTONIO", "CRISTIANE SILVA", 
+    "DANIELA DA SILVEIRA", "DANIELA FERNANDES", "DEBORA", 
+    "DIONATAN", "EDINEIA", "ELIVIANE", "ELMA", "EVELIM", 
+    "GABRIELA", "GEFFERSON", "GIZELY", "JOSE LUIZ", "JUSSARA", 
+    "LEANDRO", "LUCIENE", "LUIZA", "MIKAELY", "ROSANE", 
+    "SANDRA", "SILVANA", "TACIANE", "TATIANA", "VINICIUS", 
+    "WEVERTON", "WILLIAN"
+]
+
 LISTA_TURMAS = ["4° A", "5° A", "6° A", "6° B", "6° C", "7° A", "8° A",
                 "9° A", "9° B", "9° C", "9° D", "1° A", "1° B", "2° A", "3° A"]
 
@@ -633,7 +644,8 @@ if perfil == "👨‍🏫 Professor(a)":
         # ── Bloco 1: Identificação ──
         st.markdown('<div class="section-title">👤 Identificação</div>', unsafe_allow_html=True)
         c1, c2, c3 = st.columns([2, 1, 2])
-        with c1: nome_p  = st.text_input("Nome do(a) Professor(a) *")
+        # Aqui o selectbox substitui o text_input anterior
+        with c1: nome_p  = st.selectbox("Nome do(a) Professor(a) *", LISTA_PROFESSORES)
         with c2: turma_p = st.selectbox("Turma *", LISTA_TURMAS)
         with c3: disc_p  = st.selectbox("Disciplina *", sorted(LISTA_DISCS))
 
