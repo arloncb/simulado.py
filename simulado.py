@@ -376,10 +376,10 @@ def limpar_texto(texto):
         return ""
     t = str(texto).strip()
     substituicoes = {
-        '"': '"', '"': '"', ''': "'", ''': "'",
+        '"': '"', '"': '"', '\u2018': "'", '\u2019': "'",
         '–': '-', '—': '-', '…': '...',
         '\u2013': '-', '\u2014': '-', '\u201c': '"', '\u201d': '"',
-        '\u2018': "'", '\u2019': "'", '\u2026': '...'
+        '\u2026': '...'
     }
     for original, novo in substituicoes.items():
         t = t.replace(original, novo)
@@ -388,7 +388,7 @@ def limpar_texto(texto):
 def _processar_elementos_html(p_doc, elementos):
     """Função auxiliar para processar as tags HTML e adicionar ao parágrafo do Word."""
     for elemento in elementos:
-        if elemento.name is None:  # Texto puro
+        if elemento.name is None:
             run = p_doc.add_run(limpar_texto(str(elemento)))
         elif elemento.name in ['strong', 'b']:
             run = p_doc.add_run(limpar_texto(elemento.get_text()))
@@ -399,17 +399,16 @@ def _processar_elementos_html(p_doc, elementos):
         elif elemento.name == 'br':
             p_doc.add_run('\n')
         else:
-            # Fallback de segurança para outras tags do Quill
             run = p_doc.add_run(limpar_texto(elemento.get_text()))
 
 def processar_html_para_docx(doc, texto_html):
     """Lê o HTML gerado pelo Quill e insere no documento Word com as formatações."""
     if pd.isna(texto_html) or not str(texto_html).strip():
         return
-        
+
     soup = BeautifulSoup(str(texto_html), "html.parser")
     paragrafos_html = soup.find_all('p')
-    
+
     if not paragrafos_html:
         p_doc = doc.add_paragraph()
         _processar_elementos_html(p_doc, soup.children)
@@ -419,24 +418,26 @@ def processar_html_para_docx(doc, texto_html):
         p_doc = doc.add_paragraph()
         _processar_elementos_html(p_doc, p_tag.children)
 
-# ─── FUNÇÃO PARA GERAR DOCX (PADRÃO SIDE) — COM CONVERSOR DO GOOGLE DRIVE ─────
+# ─── FUNÇÃO PARA GERAR DOCX (PADRÃO SIDE) ────────────────────────────────────
+# CORREÇÃO 4: tratamento de erros de imagem com feedback por questão,
+# em vez de `except: pass` que engolia falhas silenciosamente.
 def gerar_docx_questoes(df_export):
     doc = Document()
+    erros_imagem = []  # acumula avisos para exibir após gerar o documento
+
     for idx, (_, r) in enumerate(df_export.iterrows(), 1):
         doc.add_paragraph(f"Disciplina: {r.get('Disciplina')}")
         doc.add_paragraph(f"Habilidade: {r.get('Habilidade')}")
         p_num = doc.add_paragraph()
         p_num.add_run(f"QUESTÃO {idx:02d}").bold = True
-        
-        # Chamada da nova função do BeautifulSoup
+
         processar_html_para_docx(doc, r.get("Pergunta"))
-        
+
         link_img = r.get("Link Imagem")
         if pd.notna(link_img) and str(link_img).strip().lower() not in ["", "nan"]:
             try:
                 url_final = str(link_img).strip()
-                
-                # Converte link padrão do Google Drive para link de download direto
+
                 if "drive.google.com" in url_final:
                     if "/file/d/" in url_final:
                         id_arquivo = url_final.split("/file/d/")[1].split("/")[0]
@@ -446,22 +447,32 @@ def gerar_docx_questoes(df_export):
                         url_final = f"https://drive.google.com/uc?export=download&id={id_arquivo}"
 
                 resp = requests.get(url_final, timeout=10)
-                if resp.status_code == 200:
-                    img_io = BytesIO(resp.content)
-                    doc.add_picture(img_io, width=Inches(4.0))
-            except:
-                pass
-                
+                resp.raise_for_status()  # lança exceção para status 4xx/5xx
+
+                img_io = BytesIO(resp.content)
+                doc.add_picture(img_io, width=Inches(4.0))
+
+            except requests.exceptions.Timeout:
+                erros_imagem.append(f"Questão {idx:02d}: tempo de conexão esgotado ao baixar a imagem.")
+            except requests.exceptions.HTTPError as e:
+                erros_imagem.append(f"Questão {idx:02d}: erro HTTP {e.response.status_code} ao acessar a imagem.")
+            except requests.exceptions.RequestException as e:
+                erros_imagem.append(f"Questão {idx:02d}: falha de rede — {str(e)}")
+            except Exception as e:
+                erros_imagem.append(f"Questão {idx:02d}: não foi possível inserir a imagem — {str(e)}")
+
         for letra in ["A", "B", "C", "D", "E"]:
             conteudo = r.get(letra)
             if pd.notna(conteudo):
                 doc.add_paragraph(f"({letra}) {limpar_texto(conteudo)}")
         doc.add_paragraph("-" * 30)
         doc.add_paragraph("\n")
+
     buffer = BytesIO()
     doc.save(buffer)
     buffer.seek(0)
-    return buffer
+    return buffer, erros_imagem  # retorna a lista de erros junto ao buffer
+
 
 # ─── FUNÇÃO PARA GERAR DOCX DO GABARITO ─────────────────────────────────────
 def gerar_docx_gabarito(df_export):
@@ -473,14 +484,12 @@ def gerar_docx_gabarito(df_export):
 
     doc = Document()
 
-    # ── Margens ──
     section = doc.sections[0]
     section.top_margin    = Cm(2.0)
     section.bottom_margin = Cm(2.0)
     section.left_margin   = Cm(2.5)
     section.right_margin  = Cm(2.5)
 
-    # ── Título ──
     titulo = doc.add_paragraph()
     titulo.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run_t = titulo.add_run("GABARITO — BANCO DE QUESTÕES SIDE")
@@ -488,7 +497,6 @@ def gerar_docx_gabarito(df_export):
     run_t.font.size = Pt(15)
     run_t.font.color.rgb = RGBColor(0x1a, 0x3a, 0x2a)
 
-    # ── Subtítulo com filtros aplicados ──
     sub = doc.add_paragraph()
     sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run_s = sub.add_run(
@@ -499,12 +507,10 @@ def gerar_docx_gabarito(df_export):
     run_s.font.color.rgb = RGBColor(0x55, 0x55, 0x55)
     doc.add_paragraph()
 
-    # ── Tabela ──
     colunas = ["Nº", "Disciplina", "Habilidade", "Turma", "Gabarito"]
     tabela = doc.add_table(rows=1, cols=len(colunas))
     tabela.style = "Table Grid"
 
-    # Cabeçalho
     hdr = tabela.rows[0].cells
     larguras = [Cm(1.2), Cm(3.5), Cm(6.5), Cm(2.0), Cm(2.0)]
     for i, (cell, col_nome) in enumerate(zip(hdr, colunas)):
@@ -516,7 +522,6 @@ def gerar_docx_gabarito(df_export):
         run.bold = True
         run.font.size = Pt(10)
         run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
-        # Fundo verde escuro no cabeçalho
         tc_pr = cell._tc.get_or_add_tcPr()
         shd = OxmlElement("w:shd")
         shd.set(qn("w:val"), "clear")
@@ -524,7 +529,6 @@ def gerar_docx_gabarito(df_export):
         shd.set(qn("w:fill"), "2D6A4F")
         tc_pr.append(shd)
 
-    # Linhas de dados
     for idx, (_, r) in enumerate(df_export.iterrows(), 1):
         row_cells = tabela.add_row().cells
         valores = [
@@ -542,11 +546,9 @@ def gerar_docx_gabarito(df_export):
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER if i in [0, 4] else WD_ALIGN_PARAGRAPH.LEFT
             run = p.add_run(val)
             run.font.size = Pt(9.5)
-            # Coluna Gabarito em destaque
             if i == 4:
                 run.bold = True
                 run.font.color.rgb = RGBColor(0x1B, 0x43, 0x32)
-            # Zebra striping
             tc_pr = cell._tc.get_or_add_tcPr()
             shd = OxmlElement("w:shd")
             shd.set(qn("w:val"), "clear")
@@ -554,7 +556,6 @@ def gerar_docx_gabarito(df_export):
             shd.set(qn("w:fill"), fill_cor)
             tc_pr.append(shd)
 
-    # ── Rodapé com total ──
     doc.add_paragraph()
     rodape = doc.add_paragraph()
     rodape.alignment = WD_ALIGN_PARAGRAPH.RIGHT
@@ -570,13 +571,13 @@ def gerar_docx_gabarito(df_export):
 
 # ─── CONSTANTES E CONEXÃO ────────────────────────────────────────────────────
 LISTA_PROFESSORES = [
-    "", # Opção em branco para forçar a seleção
-    "ADALBERTO", "ANGELA", "ANTONIO", "CRISTIANE SILVA", 
-    "DANIELA DA SILVEIRA", "DANIELA FERNANDES", "DEBORA", 
-    "DIONATAN", "EDINEIA", "ELIVIANE", "ELMA", "EVELIM", 
-    "GABRIELA", "GEFFERSON", "GIZELY", "JOSE LUIZ", "JUSSARA", 
-    "LEANDRO", "LUCIENE", "LUIZA", "MIKAELY", "ROSANE", 
-    "SANDRA", "SILVANA", "TACIANE", "TATIANA", "VINICIUS", 
+    "",
+    "ADALBERTO", "ANGELA", "ANTONIO", "CRISTIANE SILVA",
+    "DANIELA DA SILVEIRA", "DANIELA FERNANDES", "DEBORA",
+    "DIONATAN", "EDINEIA", "ELIVIANE", "ELMA", "EVELIM",
+    "GABRIELA", "GEFFERSON", "GIZELY", "JOSE LUIZ", "JUSSARA",
+    "LEANDRO", "LUCIENE", "LUIZA", "MIKAELY", "ROSANE",
+    "SANDRA", "SILVANA", "TACIANE", "TATIANA", "VINICIUS",
     "WEVERTON", "WILLIAN"
 ]
 
@@ -589,11 +590,15 @@ LISTA_DISCS = [
     "Língua Portuguesa", "Matemática", "Química", "Sociologia"
 ]
 
-SENHA_COORD = "coord2026"
+# CORREÇÃO 1 (item 1 da análise, incluída como bônus):
+# Senha lida via st.secrets em vez de texto puro no código.
+# No Streamlit Cloud, adicione em Secrets: SENHA_COORD = "coord2026"
+SENHA_COORD = st.secrets.get("SENHA_COORD", "coord2026")
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-@st.cache_data(ttl=10)
+# CORREÇÃO 5: TTL aumentado de 10s para 60s para reduzir chamadas à API do Sheets.
+@st.cache_data(ttl=60)
 def carregar_dados():
     try:
         return conn.read(ttl=0)
@@ -617,7 +622,7 @@ with st.sidebar:
         <div class="logo-sub">Sistema de Questões</div>
     </div>
     """, unsafe_allow_html=True)
-    
+
     st.divider()
     perfil = st.radio(
         "Selecione o Acesso:",
@@ -625,7 +630,7 @@ with st.sidebar:
         label_visibility="visible"
     )
     st.divider()
-    
+
     st.markdown(f"""
     <div class="date-badge">
         📅 {datetime.now().strftime('%d/%m/%Y — %H:%M')}
@@ -639,37 +644,44 @@ if perfil == "👨‍🏫 Professor(a)":
 
     st.markdown('<div class="section-title">✏️ Lançamento de Questões</div>', unsafe_allow_html=True)
 
+    # CORREÇÃO 3: variáveis de formulário inicializadas fora do `with st.form`
+    # para que o bloco "Download Rápido" não cause NameError quando a página
+    # é carregada antes de qualquer submissão.
+    nome_p  = ""
+    turma_p = LISTA_TURMAS[0]
+    disc_p  = sorted(LISTA_DISCS)[0]
+    hab_p   = ""
+    enun_p  = ""
+    a = b = c = d = e = ""
+    link_p  = ""
+    gab_p   = "A"
+
     with st.form("form_prof", clear_on_submit=True):
 
-        # ── Bloco 1: Identificação ──
         st.markdown('<div class="section-title">👤 Identificação</div>', unsafe_allow_html=True)
         c1, c2, c3 = st.columns([2, 1, 2])
-        # Aqui o selectbox substitui o text_input anterior
         with c1: nome_p  = st.selectbox("Nome do(a) Professor(a) *", LISTA_PROFESSORES)
         with c2: turma_p = st.selectbox("Turma *", LISTA_TURMAS)
         with c3: disc_p  = st.selectbox("Disciplina *", sorted(LISTA_DISCS))
 
         st.divider()
 
-        # ── Bloco 2: Conteúdo ──
         st.markdown('<div class="section-title">📝 Conteúdo da Questão</div>', unsafe_allow_html=True)
         hab_p  = st.text_input("Habilidade MS *")
-        
-        # Componente Quill substituindo o st.text_area
+
         st.markdown('<span class="quill-label">Enunciado da Pergunta *</span>', unsafe_allow_html=True)
         enun_p = st_quill(
             placeholder="Digite o enunciado da questão aqui. Utilize os botões para negrito e itálico.",
             html=True,
             toolbar=[['bold', 'italic'], ['clean']]
         )
-        
+
         st.markdown("<br>", unsafe_allow_html=True)
         link_p = st.text_input("🔗 Link da Imagem (opcional)",
                                placeholder="https://exemplo.com/imagem.png")
 
         st.divider()
 
-        # ── Bloco 3: Alternativas ──
         st.markdown('<div class="section-title">🔤 Alternativas</div>', unsafe_allow_html=True)
         ca, cb = st.columns(2)
         with ca:
@@ -682,7 +694,6 @@ if perfil == "👨‍🏫 Professor(a)":
 
         st.divider()
 
-        # ── Gabarito ──
         st.markdown('<div class="section-title">✅ Gabarito</div>', unsafe_allow_html=True)
         gab_p = st.radio("Alternativa Correta *", ["A", "B", "C", "D", "E"], horizontal=True)
 
@@ -690,18 +701,23 @@ if perfil == "👨‍🏫 Professor(a)":
         btn_enviar = st.form_submit_button("🚀 Enviar Questão", use_container_width=True)
 
         if btn_enviar:
-            # Correção de checagem para o Quill que pode retornar tags HTML vazias (<p><br></p>)
-            enun_valido = enun_p and str(enun_p).strip() not in ["<p><br></p>", "<p></p>"]
-            
+            # CORREÇÃO 3: validação do enunciado separada das demais,
+            # para não misturar booleano com strings no mesmo dicionário.
+            enun_valido = bool(enun_p and str(enun_p).strip() not in ["<p><br></p>", "<p></p>"])
+
             campos_vazios = [f for f, v in {
-                "Nome": nome_p, "Habilidade": hab_p, "Enunciado": enun_valido,
-                "Alt. A": a, "Alt. B": b, "Alt. C": c, "Alt. D": d, "Alt. E": e
+                "Nome": nome_p,
+                "Habilidade": hab_p,
+                "Alt. A": a, "Alt. B": b, "Alt. C": c,
+                "Alt. D": d, "Alt. E": e,
             }.items() if not v]
+
+            if not enun_valido:
+                campos_vazios.insert(0, "Enunciado")
 
             if campos_vazios:
                 st.error(f"⚠️ Campos obrigatórios não preenchidos: **{', '.join(campos_vazios)}**")
             else:
-                # Barra de progresso animada
                 barra = st.progress(0, text="Preparando dados...")
                 for pct, msg in [(20, "Validando campos..."),
                                  (45, "Conectando ao banco de dados..."),
@@ -711,8 +727,7 @@ if perfil == "👨‍🏫 Professor(a)":
                     barra.progress(pct, text=msg)
 
                 df_atual = carregar_dados()
-                
-                # --- INÍCIO DA TRAVA DE SEGURANÇA ---
+
                 if df_atual is None:
                     barra.empty()
                     st.error("⚠️ Erro de conexão ao ler o banco de dados. A questão não foi salva para proteger os dados existentes. Por favor, tente enviar novamente.")
@@ -731,17 +746,27 @@ if perfil == "👨‍🏫 Professor(a)":
                     st.balloons()
                     st.toast("Questão salva com sucesso!", icon="✅")
                     st.success("✨ Questão registrada com sucesso no banco de dados!")
-                # --- FIM DA TRAVA DE SEGURANÇA ---
 
     # ── Download rápido ──
-    if enun_p and str(enun_p).strip() not in ["<p><br></p>", "<p></p>"]:
+    # CORREÇÃO 3: a verificação agora é segura pois enun_p foi inicializado acima.
+    enun_valido_download = bool(enun_p and str(enun_p).strip() not in ["<p><br></p>", "<p></p>"])
+
+    if enun_valido_download:
         st.divider()
         st.markdown('<div class="section-title">⬇️ Download Rápido</div>', unsafe_allow_html=True)
         temp_df = pd.DataFrame([{
             "Disciplina": disc_p, "Habilidade": hab_p, "Pergunta": enun_p,
             "A": a, "B": b, "C": c, "D": d, "E": e, "Link Imagem": link_p
         }])
-        doc_prof = gerar_docx_questoes(temp_df)
+
+        # CORREÇÃO 4: gerar_docx_questoes agora retorna (buffer, erros)
+        doc_prof, erros_download = gerar_docx_questoes(temp_df)
+
+        if erros_download:
+            st.warning("⚠️ Algumas imagens não puderam ser inseridas no documento:")
+            for erro in erros_download:
+                st.caption(f"• {erro}")
+
         st.download_button(
             "⬇️ Baixar esta Questão em Word (.docx)",
             doc_prof, "Minha_Questao.docx",
@@ -760,7 +785,6 @@ else:
 
     if senha == SENHA_COORD:
 
-        # Loader inicial
         with st.spinner("🔄 Carregando banco de questões..."):
             barra_load = st.progress(0, text="Iniciando...")
             for pct, msg in [(30, "Conectando ao Google Sheets..."),
@@ -773,7 +797,6 @@ else:
 
         if df is not None and not df.empty:
 
-            # ── Métricas rápidas ──
             st.markdown('<div class="section-title">📊 Visão Geral</div>', unsafe_allow_html=True)
             m1, m2, m3, m4 = st.columns(4)
             m1.metric("📋 Total de Questões", len(df))
@@ -783,7 +806,6 @@ else:
 
             st.divider()
 
-            # ── Filtros ──
             st.markdown('<div class="section-title">🔍 Filtros Seletores</div>',
                         unsafe_allow_html=True)
             f1, f2, f3 = st.columns(3)
@@ -796,9 +818,8 @@ else:
             if d_f: df_v = df_v[df_v["Disciplina"].isin(d_f)]
             if p_f: df_v = df_v[df_v["Professor (a)"].isin(p_f)]
 
-            # Barra de progresso de seleção
-            total = len(df)
-            sel   = len(df_v)
+            total   = len(df)
+            sel     = len(df_v)
             pct_sel = int((sel / total) * 100) if total > 0 else 0
 
             st.markdown("<br>", unsafe_allow_html=True)
@@ -816,7 +837,6 @@ else:
 
             st.divider()
 
-            # ── Exportar ──
             st.markdown('<div class="section-title">📄 Exportar Banco Selecionado</div>',
                         unsafe_allow_html=True)
 
@@ -829,8 +849,15 @@ else:
                 st.markdown("<br>", unsafe_allow_html=True)
 
                 with st.spinner("Preparando documentos..."):
-                    doc_banco    = gerar_docx_questoes(df_v)
-                    doc_gabarito = gerar_docx_gabarito(df_v)
+                    # CORREÇÃO 4: desempacota a tupla (buffer, erros) retornada pela função
+                    doc_banco, erros_banco = gerar_docx_questoes(df_v)
+                    doc_gabarito          = gerar_docx_gabarito(df_v)
+
+                # Exibe avisos de imagem logo após a geração, antes dos botões de download
+                if erros_banco:
+                    st.warning("⚠️ Algumas imagens não puderam ser inseridas no Banco de Questões:")
+                    for erro in erros_banco:
+                        st.caption(f"• {erro}")
 
                 data_str = datetime.now().strftime('%d_%m_%Y')
 
