@@ -706,25 +706,32 @@ if perfil == "👨‍🏫 Professor(a)":
                 for pct, msg in [(20, "Validando campos..."),
                                  (45, "Conectando ao banco de dados..."),
                                  (70, "Gravando questão..."),
-                                 (90, "Finalizando..."),
-                                 (100, "Concluído!")]:
+                                 (90, "Finalizando...")]:
                     time.sleep(0.3)
                     barra.progress(pct, text=msg)
 
                 df_atual = carregar_dados()
-                nova_q = pd.DataFrame([{
-                    "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                    "Professor (a)": nome_p, "Disciplina": disc_p, "Turma": turma_p,
-                    "Habilidade": hab_p, "Pergunta": enun_p,
-                    "A": a, "B": b, "C": c, "D": d, "E": e,
-                    "Correta": gab_p, "Link Imagem": link_p
-                }])
-                conn.update(data=pd.concat([df_atual, nova_q], ignore_index=True))
+                
+                # --- INÍCIO DA TRAVA DE SEGURANÇA ---
+                if df_atual is None:
+                    barra.empty()
+                    st.error("⚠️ Erro de conexão ao ler o banco de dados. A questão não foi salva para proteger os dados existentes. Por favor, tente enviar novamente.")
+                else:
+                    barra.progress(100, text="Concluído!")
+                    nova_q = pd.DataFrame([{
+                        "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                        "Professor (a)": nome_p, "Disciplina": disc_p, "Turma": turma_p,
+                        "Habilidade": hab_p, "Pergunta": enun_p,
+                        "A": a, "B": b, "C": c, "D": d, "E": e,
+                        "Correta": gab_p, "Link Imagem": link_p
+                    }])
+                    conn.update(data=pd.concat([df_atual, nova_q], ignore_index=True))
 
-                barra.empty()
-                st.balloons()
-                st.toast("Questão salva com sucesso!", icon="✅")
-                st.success("✨ Questão registrada com sucesso no banco de dados!")
+                    barra.empty()
+                    st.balloons()
+                    st.toast("Questão salva com sucesso!", icon="✅")
+                    st.success("✨ Questão registrada com sucesso no banco de dados!")
+                # --- FIM DA TRAVA DE SEGURANÇA ---
 
     # ── Download rápido ──
     if enun_p and str(enun_p).strip() not in ["<p><br></p>", "<p></p>"]:
