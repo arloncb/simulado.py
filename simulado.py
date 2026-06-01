@@ -648,7 +648,7 @@ if perfil == "👨‍🏫 Professor(a)":
     # para que o bloco "Download Rápido" não cause NameError quando a página
     # é carregada antes de qualquer submissão.
     nome_p  = ""
-    turma_p = LISTA_TURMAS[0]
+    turma_p = []
     disc_p  = sorted(LISTA_DISCS)[0]
     hab_p   = ""
     enun_p  = ""
@@ -661,7 +661,8 @@ if perfil == "👨‍🏫 Professor(a)":
         st.markdown('<div class="section-title">👤 Identificação</div>', unsafe_allow_html=True)
         c1, c2, c3 = st.columns([2, 1, 2])
         with c1: nome_p  = st.selectbox("Nome do(a) Professor(a) *", LISTA_PROFESSORES)
-        with c2: turma_p = st.selectbox("Turma *", LISTA_TURMAS)
+        with c2: turma_p = st.multiselect("Turma(s) *", LISTA_TURMAS,
+                               placeholder="Selecione uma ou mais turmas")
         with c3: disc_p  = st.selectbox("Disciplina *", sorted(LISTA_DISCS))
 
         st.divider()
@@ -714,6 +715,8 @@ if perfil == "👨‍🏫 Professor(a)":
 
             if not enun_valido:
                 campos_vazios.insert(0, "Enunciado")
+            if not turma_p:
+                campos_vazios.insert(0, "Turma")
 
             if campos_vazios:
                 st.error(f"⚠️ Campos obrigatórios não preenchidos: **{', '.join(campos_vazios)}**")
@@ -733,19 +736,21 @@ if perfil == "👨‍🏫 Professor(a)":
                     st.error("⚠️ Erro de conexão ao ler o banco de dados. A questão não foi salva para proteger os dados existentes. Por favor, tente enviar novamente.")
                 else:
                     barra.progress(100, text="Concluído!")
-                    nova_q = pd.DataFrame([{
+                    # Uma linha por turma selecionada
+                    novas_linhas = pd.DataFrame([{
                         "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                        "Professor (a)": nome_p, "Disciplina": disc_p, "Turma": turma_p,
+                        "Professor (a)": nome_p, "Disciplina": disc_p, "Turma": t,
                         "Habilidade": hab_p, "Pergunta": enun_p,
                         "A": a, "B": b, "C": c, "D": d, "E": e,
                         "Correta": gab_p, "Link Imagem": link_p
-                    }])
-                    conn.update(data=pd.concat([df_atual, nova_q], ignore_index=True))
+                    } for t in turma_p])
+                    conn.update(data=pd.concat([df_atual, novas_linhas], ignore_index=True))
 
                     barra.empty()
                     st.balloons()
-                    st.toast("Questão salva com sucesso!", icon="✅")
-                    st.success("✨ Questão registrada com sucesso no banco de dados!")
+                    turmas_str = ", ".join(turma_p)
+                    st.toast(f"Questão salva para {len(turma_p)} turma(s)!", icon="✅")
+                    st.success(f"✨ Questão registrada com sucesso para: **{turmas_str}**")
 
     # ── Download rápido ──
     # CORREÇÃO 3: a verificação agora é segura pois enun_p foi inicializado acima.
@@ -803,6 +808,84 @@ else:
             m2.metric("📚 Disciplinas", df["Disciplina"].nunique())
             m3.metric("🏫 Turmas", df["Turma"].nunique())
             m4.metric("👩‍🏫 Professores", df["Professor (a)"].nunique())
+
+            st.divider()
+
+            # ── Painel de acompanhamento por professor ──
+            st.markdown('<div class="section-title">👩‍🏫 Acompanhamento por Professor(a)</div>',
+                        unsafe_allow_html=True)
+
+            # Meta por disciplina: LP e Matemática = 10, demais = 5
+            META_PADRAO = 5
+            META_ESPECIAL = 10
+            DISCS_ESPECIAIS = {"Língua Portuguesa", "Matemática"}
+
+            # Contagem de questões por professor e disciplina
+            resumo = (
+                df.groupby(["Professor (a)", "Disciplina"])
+                .size()
+                .reset_index(name="Enviadas")
+            )
+            resumo["Meta"] = resumo["Disciplina"].apply(
+                lambda d: META_ESPECIAL if d in DISCS_ESPECIAIS else META_PADRAO
+            )
+            resumo["Completo"] = resumo["Enviadas"] >= resumo["Meta"]
+            resumo["Faltam"]   = (resumo["Meta"] - resumo["Enviadas"]).clip(lower=0)
+
+            professores_ordenados = sorted(resumo["Professor (a)"].unique())
+
+            for prof in professores_ordenados:
+                df_prof = resumo[resumo["Professor (a)"] == prof].copy()
+                total_env  = int(df_prof["Enviadas"].sum())
+                total_meta = int(df_prof["Meta"].sum())
+                completas  = int(df_prof["Completo"].sum())
+                total_disc = len(df_prof)
+                pct_geral  = min(int((total_env / total_meta) * 100), 100) if total_meta > 0 else 0
+
+                cor_status = "#52b788" if completas == total_disc else "#e76f51"
+                icone      = "✅" if completas == total_disc else "⏳"
+
+                with st.expander(
+                    f"{icone} {prof} — {total_env}/{total_meta} questões  |  "
+                    f"{completas}/{total_disc} disciplinas completas"
+                ):
+                    st.progress(pct_geral, text=f"Progresso geral: {pct_geral}%")
+                    st.markdown("<br>", unsafe_allow_html=True)
+
+                    # Tabela por disciplina
+                    linhas_html = ""
+                    for _, row in df_prof.sort_values("Disciplina").iterrows():
+                        cor_linha = "#1b4332" if row["Completo"] else "#3d1a0a"
+                        icone_disc = "✅" if row["Completo"] else f"⚠️ faltam {int(row['Faltam'])}"
+                        pct_disc   = min(int((row["Enviadas"] / row["Meta"]) * 100), 100)
+                        barra_fill = f"width:{pct_disc}%;background:{'#52b788' if row['Completo'] else '#e9c46a'};height:6px;border-radius:4px;"
+                        linhas_html += f"""
+                        <tr style='background:{cor_linha};'>
+                            <td style='padding:7px 12px;color:#d8f3dc;font-size:0.85rem;'>{row['Disciplina']}</td>
+                            <td style='padding:7px 12px;text-align:center;color:#d8f3dc;font-size:0.85rem;'>{int(row['Enviadas'])}</td>
+                            <td style='padding:7px 12px;text-align:center;color:#a8d5bc;font-size:0.85rem;'>{int(row['Meta'])}</td>
+                            <td style='padding:7px 12px;'>
+                                <div style='background:rgba(255,255,255,0.08);border-radius:4px;overflow:hidden;'>
+                                    <div style='{barra_fill}'></div>
+                                </div>
+                            </td>
+                            <td style='padding:7px 12px;text-align:center;font-size:0.82rem;color:#c8e6d4;'>{icone_disc}</td>
+                        </tr>"""
+
+                    st.markdown(f"""
+                    <table style='width:100%;border-collapse:collapse;border-radius:10px;overflow:hidden;'>
+                        <thead>
+                            <tr style='background:#2d6a4f;'>
+                                <th style='padding:8px 12px;text-align:left;color:#d8f3dc;font-size:0.82rem;letter-spacing:0.5px;'>Disciplina</th>
+                                <th style='padding:8px 12px;text-align:center;color:#d8f3dc;font-size:0.82rem;'>Enviadas</th>
+                                <th style='padding:8px 12px;text-align:center;color:#d8f3dc;font-size:0.82rem;'>Meta</th>
+                                <th style='padding:8px 12px;color:#d8f3dc;font-size:0.82rem;'>Progresso</th>
+                                <th style='padding:8px 12px;text-align:center;color:#d8f3dc;font-size:0.82rem;'>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>{linhas_html}</tbody>
+                    </table>
+                    """, unsafe_allow_html=True)
 
             st.divider()
 
