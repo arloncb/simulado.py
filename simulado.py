@@ -419,7 +419,6 @@ def processar_html_para_docx(doc, texto_html):
         _processar_elementos_html(p_doc, p_tag.children)
 
 # ─── FUNÇÃO PARA GERAR DOCX (PADRÃO SIDE) ────────────────────────────────────
-# CORREÇÃO 4: tratamento de erros de imagem com feedback por questão.
 def gerar_docx_questoes(df_export):
     doc = Document()
     erros_imagem = []  # acumula avisos para exibir após gerar o documento
@@ -594,14 +593,10 @@ LISTA_DISCS = [
     "Língua Portuguesa", "Matemática", "Química", "Sociologia"
 ]
 
-# CORREÇÃO 1 (item 1 da análise, incluída como bônus):
-# Senha lida via st.secrets em vez de texto puro no código.
-# No Streamlit Cloud, adicione em Secrets: SENHA_COORD = "coord2026"
 SENHA_COORD = st.secrets.get("SENHA_COORD", "coord2026")
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# CORREÇÃO 5: TTL aumentado de 10s para 60s para reduzir chamadas à API do Sheets.
 @st.cache_data(ttl=60)
 def carregar_dados():
     try:
@@ -648,9 +643,6 @@ if perfil == "👨‍🏫 Professor(a)":
 
     st.markdown('<div class="section-title">✏️ Lançamento de Questões</div>', unsafe_allow_html=True)
 
-    # CORREÇÃO 3: variáveis de formulário inicializadas fora do `with st.form`
-    # para que o bloco "Download Rápido" não cause NameError quando a página
-    # é carregada antes de qualquer submissão.
     nome_p  = ""
     turma_p = []
     disc_p  = sorted(LISTA_DISCS)[0]
@@ -660,7 +652,12 @@ if perfil == "👨‍🏫 Professor(a)":
     link_p  = ""
     gab_p   = "A"
 
-    with st.form("form_prof", clear_on_submit=True):
+    # --- NOVO: Inicializa a chave do formulário no session_state ---
+    if "form_key" not in st.session_state:
+        st.session_state.form_key = 0
+
+    # --- NOVO: O formulário usa a chave dinâmica e clear_on_submit=False ---
+    with st.form(f"form_prof_{st.session_state.form_key}", clear_on_submit=False):
 
         st.markdown('<div class="section-title">👤 Identificação</div>', unsafe_allow_html=True)
         c1, c2, c3 = st.columns([2, 1, 2])
@@ -706,8 +703,6 @@ if perfil == "👨‍🏫 Professor(a)":
         btn_enviar = st.form_submit_button("🚀 Enviar Questão", use_container_width=True)
 
         if btn_enviar:
-            # CORREÇÃO 3: validação do enunciado separada das demais,
-            # para não misturar booleano com strings no mesmo dicionário.
             enun_valido = bool(enun_p and str(enun_p).strip() not in ["<p><br></p>", "<p></p>"])
 
             campos_vazios = [f for f, v in {
@@ -740,7 +735,6 @@ if perfil == "👨‍🏫 Professor(a)":
                     st.error("⚠️ Erro de conexão ao ler o banco de dados. A questão não foi salva para proteger os dados existentes. Por favor, tente enviar novamente.")
                 else:
                     barra.progress(100, text="Concluído!")
-                    # Uma linha por turma selecionada
                     novas_linhas = pd.DataFrame([{
                         "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
                         "Professor (a)": nome_p, "Disciplina": disc_p, "Turma": t,
@@ -756,8 +750,12 @@ if perfil == "👨‍🏫 Professor(a)":
                     st.toast(f"Questão salva para {len(turma_p)} turma(s)!", icon="✅")
                     st.success(f"✨ Questão registrada com sucesso para: **{turmas_str}**")
 
+                    # --- NOVO: Limpa o form SÓ depois do sucesso ---
+                    time.sleep(2) # Pausa rápida para o professor ler a mensagem de sucesso
+                    st.session_state.form_key += 1 # Muda a chave do form
+                    st.rerun() # Recarrega a página construindo um form vazio
+
     # ── Download rápido ──
-    # CORREÇÃO 3: a verificação agora é segura pois enun_p foi inicializado acima.
     enun_valido_download = bool(enun_p and str(enun_p).strip() not in ["<p><br></p>", "<p></p>"])
 
     if enun_valido_download:
@@ -768,7 +766,6 @@ if perfil == "👨‍🏫 Professor(a)":
             "A": a, "B": b, "C": c, "D": d, "E": e, "Link Imagem": link_p
         }])
 
-        # CORREÇÃO 4: gerar_docx_questoes agora retorna (buffer, erros)
         doc_prof, erros_download = gerar_docx_questoes(temp_df)
 
         if erros_download:
@@ -936,11 +933,9 @@ else:
                 st.markdown("<br>", unsafe_allow_html=True)
 
                 with st.spinner("Preparando documentos..."):
-                    # CORREÇÃO 4: desempacota a tupla (buffer, erros) retornada pela função
                     doc_banco, erros_banco = gerar_docx_questoes(df_v)
                     doc_gabarito          = gerar_docx_gabarito(df_v)
 
-                # Exibe avisos de imagem logo após a geração, antes dos botões de download
                 if erros_banco:
                     st.warning("⚠️ Algumas imagens não puderam ser inseridas no Banco de Questões:")
                     for erro in erros_banco:
