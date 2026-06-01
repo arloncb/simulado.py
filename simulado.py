@@ -419,8 +419,7 @@ def processar_html_para_docx(doc, texto_html):
         _processar_elementos_html(p_doc, p_tag.children)
 
 # ─── FUNÇÃO PARA GERAR DOCX (PADRÃO SIDE) ────────────────────────────────────
-# CORREÇÃO 4: tratamento de erros de imagem com feedback por questão,
-# em vez de `except: pass` que engolia falhas silenciosamente.
+# CORREÇÃO 4: tratamento de erros de imagem com feedback por questão.
 def gerar_docx_questoes(df_export):
     doc = Document()
     erros_imagem = []  # acumula avisos para exibir após gerar o documento
@@ -446,7 +445,12 @@ def gerar_docx_questoes(df_export):
                         id_arquivo = url_final.split("id=")[1].split("&")[0]
                         url_final = f"https://drive.google.com/uc?export=download&id={id_arquivo}"
 
-                resp = requests.get(url_final, timeout=10)
+                # --- ADIÇÃO DO USER-AGENT PARA EVITAR BLOQUEIO DE IMAGENS ---
+                cabecalhos = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                }
+
+                resp = requests.get(url_final, headers=cabecalhos, timeout=10)
                 resp.raise_for_status()  # lança exceção para status 4xx/5xx
 
                 img_io = BytesIO(resp.content)
