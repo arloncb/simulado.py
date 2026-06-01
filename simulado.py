@@ -396,10 +396,10 @@ def _processar_elementos_html(p_doc, elementos):
         elif elemento.name in ['em', 'i']:
             run = p_doc.add_run(limpar_texto(elemento.get_text()))
             run.italic = True
-        elif elemento.name == 'sub':  # <-- NOVO: Subescrito
+        elif elemento.name == 'sub':
             run = p_doc.add_run(limpar_texto(elemento.get_text()))
             run.font.subscript = True
-        elif elemento.name == 'sup':  # <-- NOVO: Sobrescrito
+        elif elemento.name == 'sup':
             run = p_doc.add_run(limpar_texto(elemento.get_text()))
             run.font.superscript = True
         elif elemento.name == 'br':
@@ -427,7 +427,7 @@ def processar_html_para_docx(doc, texto_html):
 # ─── FUNÇÃO PARA GERAR DOCX (PADRÃO SIDE) ────────────────────────────────────
 def gerar_docx_questoes(df_export):
     doc = Document()
-    erros_imagem = []  # acumula avisos para exibir após gerar o documento
+    erros_imagem = []
 
     for idx, (_, r) in enumerate(df_export.iterrows(), 1):
         doc.add_paragraph(f"Disciplina: {r.get('Disciplina')}")
@@ -450,13 +450,12 @@ def gerar_docx_questoes(df_export):
                         id_arquivo = url_final.split("id=")[1].split("&")[0]
                         url_final = f"https://drive.google.com/uc?export=download&id={id_arquivo}"
 
-                # --- ADIÇÃO DO USER-AGENT PARA EVITAR BLOQUEIO DE IMAGENS ---
                 cabecalhos = {
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
                 }
 
                 resp = requests.get(url_final, headers=cabecalhos, timeout=10)
-                resp.raise_for_status()  # lança exceção para status 4xx/5xx
+                resp.raise_for_status()
 
                 img_io = BytesIO(resp.content)
                 doc.add_picture(img_io, width=Inches(4.0))
@@ -470,17 +469,32 @@ def gerar_docx_questoes(df_export):
             except Exception as e:
                 erros_imagem.append(f"Questão {idx:02d}: não foi possível inserir a imagem — {str(e)}")
 
+        # --- NOVO: Processamento de HTML nas alternativas ---
         for letra in ["A", "B", "C", "D", "E"]:
             conteudo = r.get(letra)
-            if pd.notna(conteudo):
-                doc.add_paragraph(f"({letra}) {limpar_texto(conteudo)}")
+            if pd.notna(conteudo) and str(conteudo).strip() not in ["", "<p><br></p>", "<p></p>", "nan"]:
+                p_alt = doc.add_paragraph()
+                p_alt.add_run(f"({letra}) ").bold = True
+                
+                soup_alt = BeautifulSoup(str(conteudo), "html.parser")
+                paragrafos_alt = soup_alt.find_all('p')
+                
+                if not paragrafos_alt:
+                    _processar_elementos_html(p_alt, soup_alt.children)
+                else:
+                    for i, p_tag in enumerate(paragrafos_alt):
+                        if i > 0:
+                            p_alt = doc.add_paragraph()
+                            p_alt.add_run("    ") # recuo para múltiplas linhas
+                        _processar_elementos_html(p_alt, p_tag.children)
+
         doc.add_paragraph("-" * 30)
         doc.add_paragraph("\n")
 
     buffer = BytesIO()
     doc.save(buffer)
     buffer.seek(0)
-    return buffer, erros_imagem  # retorna a lista de erros junto ao buffer
+    return buffer, erros_imagem
 
 
 # ─── FUNÇÃO PARA GERAR DOCX DO GABARITO ─────────────────────────────────────
@@ -692,15 +706,27 @@ if perfil == "👨‍🏫 Professor(a)":
 
         st.divider()
 
+        # --- NOVO: Quill implementado nas alternativas com botões reduzidos ---
         st.markdown('<div class="section-title">🔤 Alternativas</div>', unsafe_allow_html=True)
+        
+        toolbar_alts = [['bold', 'italic'], [{'script': 'sub'}, {'script': 'super'}], ['clean']]
+        
         ca, cb = st.columns(2)
         with ca:
-            a = st.text_input("Alternativa A *", placeholder="Opção A")
-            b = st.text_input("Alternativa B *", placeholder="Opção B")
-            c = st.text_input("Alternativa C *", placeholder="Opção C")
+            st.markdown('<span class="quill-label">Alternativa A *</span>', unsafe_allow_html=True)
+            a = st_quill(key=f"alt_a_{st.session_state.form_key}", html=True, toolbar=toolbar_alts)
+            
+            st.markdown('<span class="quill-label">Alternativa B *</span>', unsafe_allow_html=True)
+            b = st_quill(key=f"alt_b_{st.session_state.form_key}", html=True, toolbar=toolbar_alts)
+            
+            st.markdown('<span class="quill-label">Alternativa C *</span>', unsafe_allow_html=True)
+            c = st_quill(key=f"alt_c_{st.session_state.form_key}", html=True, toolbar=toolbar_alts)
         with cb:
-            d = st.text_input("Alternativa D *", placeholder="Opção D")
-            e = st.text_input("Alternativa E *", placeholder="Opção E")
+            st.markdown('<span class="quill-label">Alternativa D *</span>', unsafe_allow_html=True)
+            d = st_quill(key=f"alt_d_{st.session_state.form_key}", html=True, toolbar=toolbar_alts)
+            
+            st.markdown('<span class="quill-label">Alternativa E *</span>', unsafe_allow_html=True)
+            e = st_quill(key=f"alt_e_{st.session_state.form_key}", html=True, toolbar=toolbar_alts)
 
         st.divider()
 
@@ -711,13 +737,19 @@ if perfil == "👨‍🏫 Professor(a)":
         btn_enviar = st.form_submit_button("🚀 Enviar Questão", use_container_width=True)
 
         if btn_enviar:
+            # Valida se os campos HTML das alternativas e enunciado não estão vazios
             enun_valido = bool(enun_p and str(enun_p).strip() not in ["<p><br></p>", "<p></p>"])
+            a_valido = bool(a and str(a).strip() not in ["<p><br></p>", "<p></p>"])
+            b_valido = bool(b and str(b).strip() not in ["<p><br></p>", "<p></p>"])
+            c_valido = bool(c and str(c).strip() not in ["<p><br></p>", "<p></p>"])
+            d_valido = bool(d and str(d).strip() not in ["<p><br></p>", "<p></p>"])
+            e_valido = bool(e and str(e).strip() not in ["<p><br></p>", "<p></p>"])
 
             campos_vazios = [f for f, v in {
                 "Nome": nome_p,
                 "Habilidade": hab_p,
-                "Alt. A": a, "Alt. B": b, "Alt. C": c,
-                "Alt. D": d, "Alt. E": e,
+                "Alt. A": a_valido, "Alt. B": b_valido, "Alt. C": c_valido,
+                "Alt. D": d_valido, "Alt. E": e_valido,
             }.items() if not v]
 
             if not enun_valido:
