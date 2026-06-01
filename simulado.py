@@ -461,15 +461,35 @@ def gerar_docx_questoes(df_export):
                 doc.add_picture(img_io, width=Inches(4.0))
 
             except requests.exceptions.Timeout:
-                erros_imagem.append(f"Questão {idx:02d}: tempo de conexão esgotado ao baixar a imagem.")
+                erros_imagem.append({
+                    "questao": idx,
+                    "turma": str(r.get("Turma", "—")),
+                    "disciplina": str(r.get("Disciplina", "—")),
+                    "motivo": "tempo de conexão esgotado ao baixar a imagem"
+                })
             except requests.exceptions.HTTPError as e:
-                erros_imagem.append(f"Questão {idx:02d}: erro HTTP {e.response.status_code} ao acessar a imagem.")
+                erros_imagem.append({
+                    "questao": idx,
+                    "turma": str(r.get("Turma", "—")),
+                    "disciplina": str(r.get("Disciplina", "—")),
+                    "motivo": f"erro HTTP {e.response.status_code} ao acessar a imagem"
+                })
             except requests.exceptions.RequestException as e:
-                erros_imagem.append(f"Questão {idx:02d}: falha de rede — {str(e)}")
+                erros_imagem.append({
+                    "questao": idx,
+                    "turma": str(r.get("Turma", "—")),
+                    "disciplina": str(r.get("Disciplina", "—")),
+                    "motivo": f"falha de rede — {str(e)}"
+                })
             except Exception as e:
-                erros_imagem.append(f"Questão {idx:02d}: não foi possível inserir a imagem — {str(e)}")
+                erros_imagem.append({
+                    "questao": idx,
+                    "turma": str(r.get("Turma", "—")),
+                    "disciplina": str(r.get("Disciplina", "—")),
+                    "motivo": f"não foi possível inserir a imagem — {str(e)}"
+                })
 
-        # --- NOVO: Processamento de HTML nas alternativas ---
+        # --- Processamento de HTML nas alternativas ---
         for letra in ["A", "B", "C", "D", "E"]:
             conteudo = r.get(letra)
             if pd.notna(conteudo) and str(conteudo).strip() not in ["", "<p><br></p>", "<p></p>", "nan"]:
@@ -485,7 +505,7 @@ def gerar_docx_questoes(df_export):
                     for i, p_tag in enumerate(paragrafos_alt):
                         if i > 0:
                             p_alt = doc.add_paragraph()
-                            p_alt.add_run("    ") # recuo para múltiplas linhas
+                            p_alt.add_run("    ")
                         _processar_elementos_html(p_alt, p_tag.children)
 
         doc.add_paragraph("-" * 30)
@@ -706,7 +726,6 @@ if perfil == "👨‍🏫 Professor(a)":
 
         st.divider()
 
-        # --- NOVO: Quill implementado nas alternativas com botões reduzidos ---
         st.markdown('<div class="section-title">🔤 Alternativas</div>', unsafe_allow_html=True)
         
         toolbar_alts = [['bold', 'italic'], [{'script': 'sub'}, {'script': 'super'}], ['clean']]
@@ -737,7 +756,6 @@ if perfil == "👨‍🏫 Professor(a)":
         btn_enviar = st.form_submit_button("🚀 Enviar Questão", use_container_width=True)
 
         if btn_enviar:
-            # Valida se os campos HTML das alternativas e enunciado não estão vazios
             enun_valido = bool(enun_p and str(enun_p).strip() not in ["<p><br></p>", "<p></p>"])
             a_valido = bool(a and str(a).strip() not in ["<p><br></p>", "<p></p>"])
             b_valido = bool(b and str(b).strip() not in ["<p><br></p>", "<p></p>"])
@@ -810,7 +828,7 @@ if perfil == "👨‍🏫 Professor(a)":
         if erros_download:
             st.warning("⚠️ Algumas imagens não puderam ser inseridas no documento:")
             for erro in erros_download:
-                st.caption(f"• {erro}")
+                st.caption(f"• Questão {erro['questao']:02d}: {erro['motivo']}")
 
         st.download_button(
             "⬇️ Baixar esta Questão em Word (.docx)",
@@ -851,8 +869,8 @@ else:
 
             st.divider()
 
-            # ── Painel de acompanhamento por professor ──
-            st.markdown('<div class="section-title">👩‍🏫 Acompanhamento por Professor(a)</div>',
+            # ── Painel de acompanhamento por turma ──
+            st.markdown('<div class="section-title">🏫 Acompanhamento por Turma</div>',
                         unsafe_allow_html=True)
 
             # Meta por disciplina: LP e Matemática = 10, demais = 5
@@ -860,9 +878,9 @@ else:
             META_ESPECIAL = 10
             DISCS_ESPECIAIS = {"Língua Portuguesa", "Matemática"}
 
-            # Contagem de questões por professor e disciplina
+            # Contagem de questões por turma e disciplina
             resumo = (
-                df.groupby(["Professor (a)", "Disciplina"])
+                df.groupby(["Turma", "Disciplina"])
                 .size()
                 .reset_index(name="Enviadas")
             )
@@ -872,30 +890,29 @@ else:
             resumo["Completo"] = resumo["Enviadas"] >= resumo["Meta"]
             resumo["Faltam"]   = (resumo["Meta"] - resumo["Enviadas"]).clip(lower=0)
 
-            professores_ordenados = sorted(resumo["Professor (a)"].unique())
+            turmas_ordenadas = sorted(resumo["Turma"].unique())
 
-            for prof in professores_ordenados:
-                df_prof = resumo[resumo["Professor (a)"] == prof].copy()
-                total_env  = int(df_prof["Enviadas"].sum())
-                total_meta = int(df_prof["Meta"].sum())
-                completas  = int(df_prof["Completo"].sum())
-                total_disc = len(df_prof)
+            for turma in turmas_ordenadas:
+                df_turma   = resumo[resumo["Turma"] == turma].copy()
+                total_env  = int(df_turma["Enviadas"].sum())
+                total_meta = int(df_turma["Meta"].sum())
+                completas  = int(df_turma["Completo"].sum())
+                total_disc = len(df_turma)
                 pct_geral  = min(int((total_env / total_meta) * 100), 100) if total_meta > 0 else 0
 
-                cor_status = "#52b788" if completas == total_disc else "#e76f51"
-                icone      = "✅" if completas == total_disc else "⏳"
+                icone = "✅" if completas == total_disc else "⏳"
 
                 with st.expander(
-                    f"{icone} {prof} — {total_env}/{total_meta} questões  |  "
+                    f"{icone} {turma} — {total_env}/{total_meta} questões  |  "
                     f"{completas}/{total_disc} disciplinas completas"
                 ):
                     st.progress(pct_geral, text=f"Progresso geral: {pct_geral}%")
                     st.markdown("<br>", unsafe_allow_html=True)
 
-                    # Tabela por disciplina
+                    # Tabela por disciplina dentro da turma
                     linhas_html = ""
-                    for _, row in df_prof.sort_values("Disciplina").iterrows():
-                        cor_linha = "#1b4332" if row["Completo"] else "#3d1a0a"
+                    for _, row in df_turma.sort_values("Disciplina").iterrows():
+                        cor_linha  = "#1b4332" if row["Completo"] else "#3d1a0a"
                         icone_disc = "✅" if row["Completo"] else f"⚠️ faltam {int(row['Faltam'])}"
                         pct_disc   = min(int((row["Enviadas"] / row["Meta"]) * 100), 100)
                         barra_fill = f"width:{pct_disc}%;background:{'#52b788' if row['Completo'] else '#e9c46a'};height:6px;border-radius:4px;"
@@ -976,9 +993,19 @@ else:
                     doc_gabarito          = gerar_docx_gabarito(df_v)
 
                 if erros_banco:
-                    st.warning("⚠️ Algumas imagens não puderam ser inseridas no Banco de Questões:")
+                    st.warning(f"⚠️ {len(erros_banco)} imagem(ns) não puderam ser inseridas no Banco de Questões:")
+                    # Agrupa os erros por turma e disciplina para exibição clara
+                    erros_agrupados = {}
                     for erro in erros_banco:
-                        st.caption(f"• {erro}")
+                        chave = (erro["turma"], erro["disciplina"])
+                        if chave not in erros_agrupados:
+                            erros_agrupados[chave] = []
+                        erros_agrupados[chave].append(f"Questão {erro['questao']:02d}: {erro['motivo']}")
+
+                    for (turma_err, disc_err), msgs in sorted(erros_agrupados.items()):
+                        with st.expander(f"🏫 Turma **{turma_err}** — 📚 **{disc_err}** ({len(msgs)} erro(s))"):
+                            for msg in msgs:
+                                st.caption(f"• {msg}")
 
                 data_str = datetime.now().strftime('%d_%m_%Y')
 
