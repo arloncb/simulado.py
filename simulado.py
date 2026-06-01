@@ -396,6 +396,12 @@ def _processar_elementos_html(p_doc, elementos):
         elif elemento.name in ['em', 'i']:
             run = p_doc.add_run(limpar_texto(elemento.get_text()))
             run.italic = True
+        elif elemento.name == 'sub':  # <-- NOVO: Subescrito
+            run = p_doc.add_run(limpar_texto(elemento.get_text()))
+            run.font.subscript = True
+        elif elemento.name == 'sup':  # <-- NOVO: Sobrescrito
+            run = p_doc.add_run(limpar_texto(elemento.get_text()))
+            run.font.superscript = True
         elif elemento.name == 'br':
             p_doc.add_run('\n')
         else:
@@ -652,11 +658,9 @@ if perfil == "👨‍🏫 Professor(a)":
     link_p  = ""
     gab_p   = "A"
 
-    # --- NOVO: Inicializa a chave do formulário no session_state ---
     if "form_key" not in st.session_state:
         st.session_state.form_key = 0
 
-    # --- NOVO: O formulário usa a chave dinâmica e clear_on_submit=False ---
     with st.form(f"form_prof_{st.session_state.form_key}", clear_on_submit=False):
 
         st.markdown('<div class="section-title">👤 Identificação</div>', unsafe_allow_html=True)
@@ -673,9 +677,13 @@ if perfil == "👨‍🏫 Professor(a)":
 
         st.markdown('<span class="quill-label">Enunciado da Pergunta *</span>', unsafe_allow_html=True)
         enun_p = st_quill(
-            placeholder="Digite o enunciado da questão aqui. Utilize os botões para negrito e itálico.",
+            placeholder="Digite o enunciado da questão aqui. Utilize os botões para formatação.",
             html=True,
-            toolbar=[['bold', 'italic'], ['clean']]
+            toolbar=[
+                ['bold', 'italic'], 
+                [{'script': 'sub'}, {'script': 'super'}], 
+                ['clean']
+            ]
         )
 
         st.markdown("<br>", unsafe_allow_html=True)
@@ -750,10 +758,9 @@ if perfil == "👨‍🏫 Professor(a)":
                     st.toast(f"Questão salva para {len(turma_p)} turma(s)!", icon="✅")
                     st.success(f"✨ Questão registrada com sucesso para: **{turmas_str}**")
 
-                    # --- NOVO: Limpa o form SÓ depois do sucesso ---
-                    time.sleep(2) # Pausa rápida para o professor ler a mensagem de sucesso
-                    st.session_state.form_key += 1 # Muda a chave do form
-                    st.rerun() # Recarrega a página construindo um form vazio
+                    time.sleep(2) 
+                    st.session_state.form_key += 1 
+                    st.rerun() 
 
     # ── Download rápido ──
     enun_valido_download = bool(enun_p and str(enun_p).strip() not in ["<p><br></p>", "<p></p>"])
