@@ -954,12 +954,20 @@ else:
             with f3: p_f = st.multiselect("👩‍🏫 Professor(a):", sorted(df["Professor (a)"].unique()))
 
             df_v = df.copy()
+            
+            # Filtros de Turma e Professor
             if t_f: df_v = df_v[df_v["Turma"].isin(t_f)]
-            if d_f: df_v = df_v[df_v["Disciplina"].isin(d_f)]
             if p_f: df_v = df_v[df_v["Professor (a)"].isin(p_f)]
+            
+            # Filtro e Ordenação de Disciplina
+            if d_f: 
+                df_v = df_v[df_v["Disciplina"].isin(d_f)]
+                # Transforma a disciplina em uma categoria com a ordem exata do seu clique
+                df_v["Disciplina"] = pd.Categorical(df_v["Disciplina"], categories=d_f, ordered=True)
 
-            # A ORDENAÇÃO ACONTECE AQUI
+            # Aplica a ordenação e depois converte de volta para texto padrão
             df_v = df_v.sort_values(by=["Disciplina", "Turma"]).reset_index(drop=True)
+            df_v["Disciplina"] = df_v["Disciplina"].astype(str)
 
             total   = len(df)
             sel     = len(df_v)
