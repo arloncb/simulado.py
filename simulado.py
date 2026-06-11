@@ -958,6 +958,9 @@ else:
             if d_f: df_v = df_v[df_v["Disciplina"].isin(d_f)]
             if p_f: df_v = df_v[df_v["Professor (a)"].isin(p_f)]
 
+            # A ORDENAÇÃO ACONTECE AQUI
+            df_v = df_v.sort_values(by=["Disciplina", "Turma"]).reset_index(drop=True)
+
             total   = len(df)
             sel     = len(df_v)
             pct_sel = int((sel / total) * 100) if total > 0 else 0
